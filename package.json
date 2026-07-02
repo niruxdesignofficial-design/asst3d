@@ -1,0 +1,13 @@
+{
+  "name": "asst3d",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "pnpm --parallel -r dev",
+    "dev:server": "pnpm --filter @asst3d/server dev",
+    "dev:web": "pnpm --filter @asst3d/web dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck"
+  }
+}
