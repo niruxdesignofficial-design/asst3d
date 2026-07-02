@@ -22,8 +22,12 @@ const meshyKey = process.env.MESHY_API_KEY?.trim() || "";
 
 export const config = {
   port: int("PORT", 8787),
-  dataDir: path.resolve(__dirname, "../data"),
+  // En Render/hosting: HOST=0.0.0.0 y DATA_DIR apuntando al disco persistente.
+  host: process.env.HOST?.trim() || "127.0.0.1",
+  dataDir: process.env.DATA_DIR?.trim() || path.resolve(__dirname, "../data"),
   samplesDir: path.resolve(__dirname, "../assets/samples"),
+  // Build del frontend (apps/web/dist); si existe, el server lo sirve (deploy de un solo servicio).
+  webDistDir: path.resolve(__dirname, "../../web/dist"),
 
   meshyApiKey: meshyKey,
   meshyBaseUrl: "https://api.meshy.ai",

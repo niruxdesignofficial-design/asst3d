@@ -1,4 +1,7 @@
 import Fastify from "fastify";
+import fastifyStatic from "@fastify/static";
+import fs from "node:fs";
+import path from "node:path";
 import { config } from "./config.js";
 import { openDb } from "./db/index.js";
 import { Repo } from "./db/repo.js";
@@ -24,8 +27,20 @@ seedDiscover(repo);
 registerRoutes(app, { repo, meshy, usage });
 poller.start();
 
+// Deploy de un solo servicio: si existe el build del frontend, servirlo desde acá.
+// (En dev no existe: Vite corre aparte en 5199 con proxy a /api.)
+if (fs.existsSync(path.join(config.webDistDir, "index.html"))) {
+  app.register(fastifyStatic, { root: config.webDistDir });
+  // SPA fallback: cualquier ruta que no sea /api devuelve index.html (React Router resuelve).
+  app.setNotFoundHandler((req, reply) => {
+    if (req.raw.url?.startsWith("/api/")) return reply.code(404).send({ error: "not_found" });
+    return reply.sendFile("index.html");
+  });
+  app.log.info(`Sirviendo frontend desde ${config.webDistDir}`);
+}
+
 app
-  .listen({ port: config.port, host: "127.0.0.1" })
+  .listen({ port: config.port, host: config.host })
   .then(() => {
     app.log.info(
       `ASST 3D server en http://127.0.0.1:${config.port} (meshy=${config.meshyMock ? "MOCK" : "REAL"})`

@@ -1,0 +1,41 @@
+# Blueprint de Render: New + > Blueprint > elegir este repo y listo.
+# Un solo servicio web: Fastify sirve la API y el frontend compilado.
+services:
+  - type: web
+    name: asst3d
+    runtime: node
+    plan: free
+    buildCommand: corepack enable && corepack prepare pnpm@9.15.0 --activate && pnpm install && pnpm --filter @asst3d/server gen:samples && pnpm --filter @asst3d/web build
+    startCommand: pnpm --filter @asst3d/server start
+    healthCheckPath: /api/health
+    envVars:
+      - key: HOST
+        value: 0.0.0.0
+      - key: NODE_VERSION
+        value: 20.19.0
+      # Sin key la app corre en modo MOCK (no gasta créditos).
+      # Cargá tu MESHY_API_KEY en el dashboard de Render (Environment) cuando quieras generación real.
+      - key: MESHY_API_KEY
+        sync: false
+      - key: MESHY_MOCK
+        value: "true"
+      - key: FREE_GENERATIONS_PER_USER
+        value: "3"
+      - key: GLOBAL_MONTHLY_CAP
+        value: "200"
+      - key: MESHY_MIN_BALANCE
+        value: "20"
+      - key: RATE_LIMIT_MAX_PER_MINUTE
+        value: "3"
+      - key: RATE_LIMIT_MAX_PER_HOUR
+        value: "10"
+      - key: PAYMENTS_ENABLED
+        value: "false"
+      # OJO: en el plan free el disco es efímero (la DB SQLite se resetea en cada deploy).
+      # Para persistir: agregar un disk en Render y setear DATA_DIR al mount path.
+      # - key: DATA_DIR
+      #   value: /var/data
+# disk:
+#   name: asst3d-data
+#   mountPath: /var/data
+#   sizeGB: 1
