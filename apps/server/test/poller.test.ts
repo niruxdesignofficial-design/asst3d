@@ -128,6 +128,34 @@ describe("JobPoller", () => {
     expect(meshy.refineCreated).toHaveLength(0);
   });
 
+  it("usa el cliente del provider de la fila (fast) y el default para el resto", async () => {
+    const fastMeshy = new ScriptedMeshy();
+    const pollerWithFast = new JobPoller(repo, meshy, 3000, undefined, { fast: fastMeshy });
+
+    // fila fast -> debe consultar al cliente fast
+    const fastRow = repo.createGeneration({
+      userId: "u1", kind: "text", prompt: "fast robot", styleId: "lowpoly",
+      modelType: "lowpoly", isPublic: true, provider: "fast",
+    });
+    repo.updateGeneration(fastRow.id, { meshy_task_id: "f1", status: "processing" });
+    fastMeshy.set("f1", { status: "IN_PROGRESS", progress: 80 });
+
+    // fila normal -> cliente default
+    const normalRow = newTextGen();
+    repo.updateGeneration(normalRow.id, { meshy_task_id: "n1", status: "processing" });
+    meshy.set("n1", { status: "IN_PROGRESS", progress: 20 });
+
+    await pollerWithFast.tick();
+    expect(repo.getGeneration(fastRow.id)!.progress).toBe(40); // 80% de preview
+    expect(repo.getGeneration(normalRow.id)!.progress).toBe(10);
+
+    // al terminar el preview fast, el refine se encadena en el cliente FAST
+    fastMeshy.set("f1", { status: "SUCCEEDED", progress: 100 });
+    await pollerWithFast.tick();
+    expect(fastMeshy.refineCreated).toEqual(["f1"]);
+    expect(meshy.refineCreated).toHaveLength(0);
+  });
+
   it("proveedor de un paso (twoStage=false): texto termina sin encadenar refine", async () => {
     meshy.twoStage = false; // como 3D AI Studio
     const row = newTextGen();

@@ -7,7 +7,7 @@ import { openDb } from "./db/index.js";
 import { Repo } from "./db/repo.js";
 import { RealMeshyClient } from "./meshy/client.js";
 import { MockMeshyClient } from "./meshy/mock.js";
-import { ThreeDAIClient } from "./meshy/threedai.js";
+import { ThreeDAIClient, ThreeDAIFastClient } from "./meshy/threedai.js";
 import { persistModels } from "./persist.js";
 import { UsageControl } from "./limits.js";
 import { JobPoller } from "./poller.js";
@@ -27,11 +27,20 @@ const meshy =
     : config.provider === "meshy"
       ? new RealMeshyClient()
       : new MockMeshyClient();
+// Modo Fast (~30-60s) via 3D AI Studio, disponible si hay key y no estamos en mock.
+const fast =
+  !config.meshyMock && config.threedaiApiKey ? new ThreeDAIFastClient() : undefined;
 const usage = new UsageControl(repo, meshy, config);
-const poller = new JobPoller(repo, meshy, config.meshyMock ? 1000 : 4000, persistModels);
+const poller = new JobPoller(
+  repo,
+  meshy,
+  config.meshyMock ? 1000 : 4000,
+  persistModels,
+  fast ? { fast } : undefined
+);
 
 seedDiscover(repo);
-registerRoutes(app, { repo, meshy, usage });
+registerRoutes(app, { repo, meshy, usage, fast });
 poller.start();
 
 // Deploy de un solo servicio: si existe el build del frontend, servirlo desde acá.

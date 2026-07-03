@@ -69,6 +69,9 @@ const MIGRATIONS: string[] = [
 // así que se intentan y se ignora el "duplicate column" en DBs ya migradas.
 const COLUMN_MIGRATIONS: string[] = [
   `ALTER TABLE users ADD COLUMN bonus_generations INTEGER NOT NULL DEFAULT 0`,
+  // Qué proveedor procesa cada job (fast=3daistudio, quality=meshy, mock…):
+  // el poller usa esto para consultar el cliente correcto.
+  `ALTER TABLE generations ADD COLUMN provider TEXT`,
 ];
 
 export function openDb(dbPath?: string): Database.Database {

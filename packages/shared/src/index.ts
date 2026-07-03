@@ -71,6 +71,13 @@ export type AiModelId = (typeof AI_MODELS)[number]["id"];
 export const POLYCOUNT_MIN = 500;
 export const POLYCOUNT_MAX = 100_000;
 
+/** Velocidad de generación: fast ≈ 30-60s (TRELLIS), quality ≈ 2-6 min (más detalle). */
+export type GenerationSpeed = "fast" | "quality";
+export const SPEED_OPTIONS: { id: GenerationSpeed; label: string; blurb: string }[] = [
+  { id: "fast", label: "⚡ Fast", blurb: "~30-60 seconds — great for quick iteration" },
+  { id: "quality", label: "✦ Quality", blurb: "2-6 minutes — more detail and cleaner textures" },
+];
+
 export const DOWNLOAD_FORMATS = ["glb", "fbx", "obj", "usdz"] as const;
 export type DownloadFormat = (typeof DOWNLOAD_FORMATS)[number];
 
@@ -129,6 +136,7 @@ export interface GenerateRequest {
   modelType?: ModelType;
   targetPolycount?: number;
   aiModelId?: AiModelId;
+  speed?: GenerationSpeed;
   isPublic?: boolean;
 }
 

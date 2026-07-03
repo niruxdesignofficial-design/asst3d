@@ -26,6 +26,8 @@ interface Ctx {
   repo: Repo;
   meshy: MeshyClient;
   usage: UsageControl;
+  /** cliente del modo Fast (~30-60s); undefined si no hay key de 3D AI Studio */
+  fast?: MeshyClient;
 }
 
 function deviceIdOf(req: FastifyRequest): string | null {
@@ -141,6 +143,10 @@ export function registerRoutes(app: FastifyInstance, ctx: Ctx): void {
     if (deny === "free_limit_reached") return reply.code(402).send({ error: deny });
     if (deny === "capacity_reached") return reply.code(503).send({ error: deny });
 
+    // Modo Fast (~30-60s via TRELLIS) si está disponible; si no, el default.
+    const useFast = body.speed === "fast" && !!ctx.fast;
+    const client = useFast ? ctx.fast! : ctx.meshy;
+
     const row = repo.createGeneration({
       userId: user.id,
       kind: body.kind,
@@ -148,19 +154,20 @@ export function registerRoutes(app: FastifyInstance, ctx: Ctx): void {
       styleId: style.id,
       modelType,
       isPublic: body.isPublic !== false,
+      provider: useFast ? "fast" : undefined,
     });
 
     try {
       let taskId: string;
       if (body.kind === "text") {
-        taskId = await ctx.meshy.createTextPreview({
+        taskId = await client.createTextPreview({
           prompt: `${prompt}, ${style.promptSuffix}`,
           modelType,
           targetPolycount,
           aiModel,
         });
       } else {
-        taskId = await ctx.meshy.createImageTo3D({
+        taskId = await client.createImageTo3D({
           imageDataUri: body.imageDataUri!,
           modelType,
           targetPolycount,

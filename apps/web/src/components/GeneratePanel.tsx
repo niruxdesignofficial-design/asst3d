@@ -5,10 +5,12 @@ import {
   MAX_IMAGE_BYTES,
   POLYCOUNT_MAX,
   POLYCOUNT_MIN,
+  SPEED_OPTIONS,
   STYLE_PRESETS,
   type AiModelId,
   type GenerationDto,
   type GenerationKind,
+  type GenerationSpeed,
   type ModelType,
 } from "@asst3d/shared";
 import { ApiError, generate } from "../lib/api";
@@ -43,6 +45,7 @@ export function GeneratePanel({ onStarted, onDenied, compact = false, initialPro
   const [modelType, setModelType] = useState<ModelType | null>(null);
   const [polycount, setPolycount] = useState<number | null>(null);
   const [aiModelId, setAiModelId] = useState<AiModelId>(AI_MODELS[0].id);
+  const [speed, setSpeed] = useState<GenerationSpeed>("fast");
   const [image, setImage] = useState<{ dataUri: string; name: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -95,6 +98,7 @@ export function GeneratePanel({ onStarted, onDenied, compact = false, initialPro
         modelType: modelType ?? undefined,
         targetPolycount: polycount ?? undefined,
         aiModelId,
+        speed,
       });
       onStarted(gen);
       setPrompt("");
@@ -177,6 +181,22 @@ export function GeneratePanel({ onStarted, onDenied, compact = false, initialPro
           />
         </div>
       )}
+
+      <div className="field">
+        <label className="field-label">Speed</label>
+        <div className="seg seg-block">
+          {SPEED_OPTIONS.map((s) => (
+            <button
+              key={s.id}
+              className={speed === s.id ? "seg-on" : ""}
+              title={s.blurb}
+              onClick={() => setSpeed(s.id)}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <div className="field">
         <label className="field-label">Art style</label>
@@ -262,7 +282,7 @@ export function GeneratePanel({ onStarted, onDenied, compact = false, initialPro
           </div>
 
           <div className="cost-row">
-            <span className="muted small">≈ 2 min</span>
+            <span className="muted small">{speed === "fast" ? "≈ 30-60 sec" : "≈ 2-6 min"}</span>
             <span className="muted small">·</span>
             <span className="small">1 free generation</span>
           </div>

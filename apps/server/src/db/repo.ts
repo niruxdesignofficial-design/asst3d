@@ -29,6 +29,7 @@ export interface GenerationRow {
   stage: string | null;
   progress: number;
   meshy_task_id: string | null;
+  provider: string | null;
   model_urls: string | null;
   thumbnail_url: string | null;
   thumbnail_data: string | null;
@@ -57,6 +58,15 @@ export class Repo {
     return this.db.prepare(`SELECT * FROM users WHERE id = ?`).get(deviceId) as
       | UserRow
       | undefined;
+  }
+
+  /** Devuelve una generación al cupo del usuario (cuando el job falla). */
+  refundUsage(userId: string): void {
+    this.db
+      .prepare(
+        `UPDATE users SET generations_used = MAX(0, generations_used - 1) WHERE id = ?`
+      )
+      .run(userId);
   }
 
   incrementUsage(userId: string, ip: string | null, generationId: string): void {
@@ -156,14 +166,15 @@ export class Repo {
     styleId: string;
     modelType: string;
     isPublic: boolean;
+    provider?: string;
   }): GenerationRow {
     const id = randomUUID();
     const now = Date.now();
     this.db
       .prepare(
         `INSERT INTO generations
-           (id, user_id, kind, prompt, style_id, model_type, status, stage, progress, is_public, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, 0, ?, ?, ?)`
+           (id, user_id, kind, prompt, style_id, model_type, status, stage, progress, is_public, provider, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, 0, ?, ?, ?, ?)`
       )
       .run(
         id,
@@ -174,6 +185,7 @@ export class Repo {
         input.modelType,
         input.kind === "text" ? "preview" : null,
         input.isPublic ? 1 : 0,
+        input.provider ?? null,
         now,
         now
       );
