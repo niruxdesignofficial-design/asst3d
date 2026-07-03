@@ -20,7 +20,7 @@ import type { Repo } from "./db/repo.js";
 import type { MeshyClient } from "./meshy/types.js";
 import type { UsageControl } from "./limits.js";
 import { resolveSampleUrl } from "./meshy/mock.js";
-import { storage, isStoredRef } from "./storage.js";
+import { getStorage, isStoredRef } from "./storage.js";
 
 interface Ctx {
   repo: Repo;
@@ -302,7 +302,7 @@ export function registerRoutes(app: FastifyInstance, ctx: Ctx): void {
     const row = await repo.getGeneration(id);
     if (!row?.thumbnail_url) return reply.code(404).send({ error: "not_found" });
     if (isStoredRef(row.thumbnail_url)) {
-      const stream = await storage.stream(row.thumbnail_url);
+      const stream = await getStorage().stream(row.thumbnail_url);
       if (!stream) return reply.code(404).send({ error: "not_found" });
       reply.header("Cache-Control", "public, max-age=86400");
       return reply.type("image/png").send(stream);
@@ -327,7 +327,7 @@ export function registerRoutes(app: FastifyInstance, ctx: Ctx): void {
       return reply.type(contentType).send(fs.createReadStream(sample));
     }
     if (isStoredRef(url)) {
-      const stream = await storage.stream(url);
+      const stream = await getStorage().stream(url);
       if (!stream) return reply.code(404).send({ error: "not_found" });
       reply.header("Cache-Control", "public, max-age=86400");
       return reply.type(contentType).send(stream);

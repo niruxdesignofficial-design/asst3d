@@ -144,6 +144,14 @@ const SQLITE_MIGRATIONS: string[] = [
     created_at INTEGER NOT NULL
   )`,
   `CREATE INDEX IF NOT EXISTS idx_comments_gen ON comments(generation_id, created_at)`,
+  // Archivos persistidos (GLBs/thumbnails) cuando no hay object storage:
+  // viven en la DB misma y así sobreviven a los discos efímeros del hosting.
+  `CREATE TABLE IF NOT EXISTS blobs (
+    key TEXT PRIMARY KEY,
+    content_type TEXT NOT NULL,
+    data BLOB NOT NULL,
+    created_at INTEGER NOT NULL
+  )`,
 ];
 
 const SQLITE_COLUMN_MIGRATIONS: string[] = [
@@ -212,6 +220,12 @@ const PG_MIGRATIONS: string[] = [
     created_at BIGINT NOT NULL
   )`,
   `CREATE INDEX IF NOT EXISTS idx_comments_gen ON comments(generation_id, created_at)`,
+  `CREATE TABLE IF NOT EXISTS blobs (
+    key TEXT PRIMARY KEY,
+    content_type TEXT NOT NULL,
+    data BYTEA NOT NULL,
+    created_at BIGINT NOT NULL
+  )`,
 ];
 
 export interface OpenOptions {

@@ -9,6 +9,7 @@ import { RealMeshyClient } from "./meshy/client.js";
 import { MockMeshyClient } from "./meshy/mock.js";
 import { ThreeDAIClient, ThreeDAIFastClient } from "./meshy/threedai.js";
 import { persistModels } from "./persist.js";
+import { initStorage } from "./storage.js";
 import { UsageControl } from "./limits.js";
 import { JobPoller } from "./poller.js";
 import { registerRoutes } from "./routes.js";
@@ -21,6 +22,8 @@ const app = Fastify({
 
 const db = await openDb();
 const repo = new Repo(db);
+// Storage de modelos: R2 > blobs en la DB (Neon) > disco local.
+initStorage(db);
 const meshy =
   config.provider === "3daistudio"
     ? new ThreeDAIClient()

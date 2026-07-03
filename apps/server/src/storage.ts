@@ -7,17 +7,20 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3";
 import { config } from "./config.js";
+import type { DbDriver } from "./db/driver.js";
 
 /**
- * Storage dual para los archivos persistidos (GLBs, thumbnails):
- *  - disco local (default): refs "local://<archivo>"
- *  - Cloudflare R2 (si hay credenciales): refs "r2://<key>" — sobrevive deploys.
+ * Storage para los archivos persistidos (GLBs, thumbnails). Prioridad:
+ *  1. Cloudflare R2 (si hay credenciales) — refs "r2://<key>"
+ *  2. La propia base de datos (si hay DATABASE_URL) — refs "db://<key>"
+ *     Sin cuentas extra: los modelos viven en Neon junto con los datos.
+ *  3. Disco local (default en dev) — refs "local://<archivo>"
  */
 
 export interface ModelStorage {
-  /** guarda el buffer y devuelve la ref (local://x o r2://x) */
+  /** guarda el buffer y devuelve la ref */
   put(key: string, data: Buffer, contentType: string): Promise<string>;
-  /** stream de lectura para una ref propia; null si la ref no es de este storage */
+  /** stream de lectura para una ref persistida; null si no existe */
   stream(ref: string): Promise<Readable | null>;
 }
 
@@ -44,9 +47,37 @@ class DiskStorage implements ModelStorage {
   }
 }
 
+/** Blobs dentro de la DB (tabla blobs): sobrevive discos efímeros sin cuentas extra. */
+export class DbStorage implements ModelStorage {
+  constructor(
+    private db: DbDriver,
+    private fallback: ModelStorage
+  ) {}
+
+  async put(key: string, data: Buffer, contentType: string): Promise<string> {
+    await this.db.run(
+      `INSERT INTO blobs (key, content_type, data, created_at) VALUES (?, ?, ?, ?)
+       ON CONFLICT(key) DO UPDATE SET data = excluded.data, content_type = excluded.content_type`,
+      [key, contentType, data, Date.now()]
+    );
+    return `db://${key}`;
+  }
+
+  async stream(ref: string): Promise<Readable | null> {
+    if (ref.startsWith("local://")) return this.fallback.stream(ref);
+    if (!ref.startsWith("db://")) return null;
+    const key = ref.slice("db://".length);
+    const row = await this.db.get<{ data: Buffer }>(`SELECT data FROM blobs WHERE key = ?`, [
+      key,
+    ]);
+    if (!row?.data) return null;
+    return Readable.from(Buffer.isBuffer(row.data) ? row.data : Buffer.from(row.data));
+  }
+}
+
 class R2Storage implements ModelStorage {
   private client: S3Client;
-  constructor(private fallback: DiskStorage) {
+  constructor(private fallback: ModelStorage) {
     this.client = new S3Client({
       region: "auto",
       endpoint: `https://${config.r2AccountId}.r2.cloudflarestorage.com`,
@@ -70,9 +101,8 @@ class R2Storage implements ModelStorage {
   }
 
   async stream(ref: string): Promise<Readable | null> {
-    // sigue sabiendo leer refs locales viejas (modelos de antes de configurar R2)
-    if (ref.startsWith("local://")) return this.fallback.stream(ref);
-    if (!ref.startsWith("r2://")) return null;
+    // sigue sabiendo leer refs de los otros storages (archivos de antes del cambio)
+    if (!ref.startsWith("r2://")) return this.fallback.stream(ref);
     const key = ref.slice("r2://".length);
     try {
       const out = await this.client.send(
@@ -86,17 +116,28 @@ class R2Storage implements ModelStorage {
   }
 }
 
-export function createStorage(): ModelStorage {
+let active: ModelStorage = new DiskStorage();
+
+/** Se llama una vez al boot, cuando ya existe la conexión a la DB. */
+export function initStorage(db: DbDriver): ModelStorage {
   const disk = new DiskStorage();
-  if (config.r2AccountId && config.r2AccessKeyId && config.r2SecretAccessKey && config.r2Bucket) {
-    return new R2Storage(disk);
+  const hasR2 =
+    config.r2AccountId && config.r2AccessKeyId && config.r2SecretAccessKey && config.r2Bucket;
+  if (hasR2) {
+    active = new R2Storage(new DbStorage(db, disk));
+  } else if (config.databaseUrl) {
+    active = new DbStorage(db, disk);
+  } else {
+    active = disk;
   }
-  return disk;
+  return active;
 }
 
-export const storage = createStorage();
+export function getStorage(): ModelStorage {
+  return active;
+}
 
 /** true si la ref es de un storage nuestro (persistida) y no una URL upstream. */
 export function isStoredRef(url: string): boolean {
-  return url.startsWith("local://") || url.startsWith("r2://");
+  return url.startsWith("local://") || url.startsWith("r2://") || url.startsWith("db://");
 }
