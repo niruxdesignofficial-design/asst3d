@@ -28,7 +28,7 @@ export class RealMeshyClient implements MeshyClient {
     const body: Record<string, unknown> = {
       mode: "preview",
       prompt: opts.prompt,
-      ai_model: "latest",
+      ai_model: opts.aiModel ?? "latest",
       model_type: opts.modelType,
       target_formats: ["glb", "fbx", "obj", "usdz"],
     };

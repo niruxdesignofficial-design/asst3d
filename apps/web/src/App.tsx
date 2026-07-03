@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Route, Routes } from "react-router-dom";
+import { Link, Route, Routes } from "react-router-dom";
 import type { MeDto } from "@asst3d/shared";
 import { getMe } from "./lib/api";
 import { Navbar } from "./components/Navbar";
@@ -22,8 +22,40 @@ export default function App() {
         <Route path="/" element={<Home me={me} refreshMe={refreshMe} />} />
         <Route path="/workspace" element={<Workspace me={me} refreshMe={refreshMe} />} />
       </Routes>
-      <footer className="footer muted small">
-        ASST 3D — generación de modelos 3D con IA para game-devs
+
+      <footer className="footer">
+        <div className="footer-grid">
+          <div className="footer-brand">
+            <div className="nav-logo">
+              <span className="nav-logo-mark">▲</span> ASST 3D
+            </div>
+            <p className="muted small">
+              AI 3D model generation for game developers. Describe it, preview it, ship it.
+            </p>
+          </div>
+          <div className="footer-col">
+            <h4>Product</h4>
+            <Link to="/workspace">Text to 3D</Link>
+            <Link to="/workspace">Image to 3D</Link>
+            <Link to="/">Community gallery</Link>
+          </div>
+          <div className="footer-col">
+            <h4>Export</h4>
+            <span>GLB / GLTF</span>
+            <span>FBX</span>
+            <span>OBJ · USDZ</span>
+          </div>
+          <div className="footer-col">
+            <h4>Access</h4>
+            <span>3 free generations</span>
+            <span>Token access — soon</span>
+            <span>API — soon</span>
+          </div>
+        </div>
+        <div className="footer-legal muted small">
+          © {new Date().getFullYear()} ASST 3D · Sample gallery models from the Khronos glTF
+          Sample Assets (CC0 / CC BY 4.0)
+        </div>
       </footer>
     </>
   );

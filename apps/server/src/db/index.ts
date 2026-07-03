@@ -49,6 +49,14 @@ const MIGRATIONS: string[] = [
     generation_id TEXT,
     at INTEGER NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS comments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    generation_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    body TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_comments_gen ON comments(generation_id, created_at)`,
 ];
 
 export function openDb(dbPath?: string): Database.Database {

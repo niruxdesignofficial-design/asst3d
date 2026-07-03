@@ -5,7 +5,7 @@ services:
     name: asst3d
     runtime: node
     plan: free
-    buildCommand: corepack enable && corepack prepare pnpm@9.15.0 --activate && pnpm install && pnpm --filter @asst3d/server gen:samples && pnpm --filter @asst3d/web build
+    buildCommand: corepack enable && corepack prepare pnpm@9.15.0 --activate && pnpm install && pnpm --filter @asst3d/web build
     startCommand: pnpm --filter @asst3d/server start
     healthCheckPath: /api/health
     envVars:

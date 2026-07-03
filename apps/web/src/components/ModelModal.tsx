@@ -1,6 +1,12 @@
-import { useEffect } from "react";
-import { DOWNLOAD_FORMATS, STYLE_PRESETS, type GenerationDto } from "@asst3d/shared";
-import { downloadUrl, likeGeneration } from "../lib/api";
+import { useEffect, useState } from "react";
+import {
+  DOWNLOAD_FORMATS,
+  MAX_COMMENT_LENGTH,
+  STYLE_PRESETS,
+  type CommentDto,
+  type GenerationDto,
+} from "@asst3d/shared";
+import { downloadUrl, likeGeneration, listComments, postComment } from "../lib/api";
 import { ModelViewer } from "./ModelViewer";
 
 interface Props {
@@ -8,8 +14,14 @@ interface Props {
   onClose: () => void;
 }
 
-/** Detalle de modelo: visor grande + panel con info y descargas (como Meshy). */
+/** Model detail: big viewer + info panel with downloads and comments. */
 export function ModelModal({ gen, onClose }: Props) {
+  const [likes, setLikes] = useState(gen.likes);
+  const [comments, setComments] = useState<CommentDto[]>([]);
+  const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
+  const [copied, setCopied] = useState(false);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
@@ -20,43 +32,83 @@ export function ModelModal({ gen, onClose }: Props) {
     };
   }, [onClose]);
 
+  useEffect(() => {
+    listComments(gen.id).then(setComments).catch(() => {});
+  }, [gen.id]);
+
   const style = STYLE_PRESETS.find((s) => s.id === gen.styleId);
+
+  const share = () => {
+    navigator.clipboard
+      .writeText(`${location.origin}/?model=${gen.id}`)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1600);
+      })
+      .catch(() => {});
+  };
+
+  const sendComment = async () => {
+    const body = draft.trim();
+    if (!body || sending) return;
+    setSending(true);
+    try {
+      const c = await postComment(gen.id, body);
+      setComments((prev) => [...prev, c]);
+      setDraft("");
+    } catch {
+      /* keep the draft so the user can retry */
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const timeAgo = (ts: number) => {
+    const days = Math.floor((Date.now() - ts) / 86_400_000);
+    if (days <= 0) return "today";
+    if (days === 1) return "yesterday";
+    if (days < 30) return `${days} days ago`;
+    const months = Math.floor(days / 30);
+    return months === 1 ? "1 month ago" : `${months} months ago`;
+  };
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <button className="modal-close" onClick={onClose} aria-label="Cerrar">
-          ✕ Cerrar
+        <button className="modal-close" onClick={onClose} aria-label="Close">
+          ✕ Close
         </button>
         <div className="modal-viewer">
           {gen.viewerUrl ? (
-            <ModelViewer src={gen.viewerUrl} />
+            <ModelViewer src={gen.viewerUrl} showStats />
           ) : (
-            <div className="viewer-overlay">Modelo no disponible</div>
+            <div className="viewer-overlay">Model unavailable</div>
           )}
         </div>
         <aside className="modal-side">
           <div className="modal-author">
             <span className="avatar-dot big">{gen.authorName.slice(0, 1).toUpperCase()}</span>
-            <div>
+            <div className="modal-author-info">
               <strong>{gen.authorName}</strong>
-              <div className="muted small">
-                {new Date(gen.createdAt).toLocaleDateString("es-AR")}
-              </div>
+              <div className="muted small">{timeAgo(gen.createdAt)}</div>
             </div>
+            <button className="btn-mini" disabled title="Profiles coming soon">
+              + Follow
+            </button>
           </div>
 
-          <h2 className="modal-title">{gen.prompt ?? "Sin título"}</h2>
+          <h2 className="modal-title">{gen.prompt ?? "Untitled"}</h2>
 
           <div className="tag-row">
             {style && <span className="tag">{style.label}</span>}
-            <span className="tag">{gen.kind === "text" ? "texto → 3D" : "imagen → 3D"}</span>
+            <span className="tag">{gen.kind === "text" ? "text → 3D" : "image → 3D"}</span>
             <span className="tag">game-ready</span>
+            <span className="tag tag-license">CC0</span>
           </div>
 
           <div className="modal-section">
-            <h3>Descargar</h3>
-            <p className="muted small">Formatos listos para tu motor de juego</p>
+            <h3>Download</h3>
+            <p className="muted small">Formats ready for your game engine</p>
             <div className="dl-grid">
               {DOWNLOAD_FORMATS.map((f) => {
                 const available = gen.formats.includes(f);
@@ -75,13 +127,58 @@ export function ModelModal({ gen, onClose }: Props) {
             </div>
           </div>
 
-          <div className="modal-section">
+          <div className="modal-actions">
             <button
               className="btn-secondary"
-              onClick={() => likeGeneration(gen.id).catch(() => {})}
+              onClick={() => {
+                likeGeneration(gen.id)
+                  .then(({ likes: n }) => setLikes(n))
+                  .catch(() => {});
+              }}
             >
-              ♥ Me gusta ({gen.likes})
+              ♥ {likes}
             </button>
+            <button className="btn-secondary" onClick={share}>
+              {copied ? "✓ Link copied" : "↗ Share"}
+            </button>
+          </div>
+
+          <div className="modal-section comments">
+            <h3>
+              {comments.length === 0
+                ? "Comments"
+                : `${comments.length} comment${comments.length === 1 ? "" : "s"}`}
+            </h3>
+            <div className="comment-list">
+              {comments.map((c) => (
+                <div key={c.id} className="comment">
+                  <span className="avatar-dot">{c.authorName.slice(0, 1).toUpperCase()}</span>
+                  <div>
+                    <div className="comment-head">
+                      <strong>{c.authorName}</strong>
+                      <span className="muted small">{timeAgo(c.createdAt)}</span>
+                    </div>
+                    <p>{c.body}</p>
+                  </div>
+                </div>
+              ))}
+              {comments.length === 0 && (
+                <p className="muted small">Be the first to comment on this model.</p>
+              )}
+            </div>
+            <div className="comment-box">
+              <input
+                className="search"
+                placeholder="Post a comment…"
+                value={draft}
+                maxLength={MAX_COMMENT_LENGTH}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && sendComment()}
+              />
+              <button className="btn-mini" disabled={sending || !draft.trim()} onClick={sendComment}>
+                Send
+              </button>
+            </div>
           </div>
         </aside>
       </div>

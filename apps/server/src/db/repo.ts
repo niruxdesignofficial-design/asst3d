@@ -71,6 +71,39 @@ export class Repo {
     this.db.prepare(`UPDATE users SET wallet_address = ? WHERE id = ?`).run(address, userId);
   }
 
+  setDisplayName(userId: string, name: string): void {
+    this.db.prepare(`UPDATE users SET display_name = ? WHERE id = ?`).run(name, userId);
+  }
+
+  // ---- comments ----
+  listComments(generationId: string, limit = 100): Array<{
+    id: number;
+    user_id: string;
+    body: string;
+    created_at: number;
+  }> {
+    return this.db
+      .prepare(
+        `SELECT id, user_id, body, created_at FROM comments
+         WHERE generation_id = ? ORDER BY created_at ASC LIMIT ?`
+      )
+      .all(generationId, limit) as Array<{
+      id: number;
+      user_id: string;
+      body: string;
+      created_at: number;
+    }>;
+  }
+
+  addComment(generationId: string, userId: string, body: string): number {
+    const r = this.db
+      .prepare(
+        `INSERT INTO comments (generation_id, user_id, body, created_at) VALUES (?, ?, ?, ?)`
+      )
+      .run(generationId, userId, body, Date.now());
+    return Number(r.lastInsertRowid);
+  }
+
   // ---- tope global mensual ----
   currentMonth(): string {
     return new Date().toISOString().slice(0, 7);

@@ -1,39 +1,51 @@
 import { useRef, useState } from "react";
 import {
   ACCEPTED_IMAGE_TYPES,
+  AI_MODELS,
   MAX_IMAGE_BYTES,
+  POLYCOUNT_MAX,
+  POLYCOUNT_MIN,
   STYLE_PRESETS,
+  type AiModelId,
   type GenerationDto,
   type GenerationKind,
+  type ModelType,
 } from "@asst3d/shared";
 import { ApiError, generate } from "../lib/api";
 
 interface Props {
   onStarted: (gen: GenerationDto) => void;
   onDenied: (code: string) => void;
-  /** compacto = caja de la home; completo = panel del workspace */
+  /** compact = home hero box; full = workspace panel with advanced controls */
   compact?: boolean;
 }
 
-/** Formulario de generación (texto o imagen). La decisión de si puede generar es del server. */
+/** Generation form (text or image). Whether it CAN generate is always the server's call. */
 export function GeneratePanel({ onStarted, onDenied, compact = false }: Props) {
   const [kind, setKind] = useState<GenerationKind>("text");
   const [prompt, setPrompt] = useState("");
   const [styleId, setStyleId] = useState(STYLE_PRESETS[0].id);
+  const [modelType, setModelType] = useState<ModelType | null>(null);
+  const [polycount, setPolycount] = useState<number | null>(null);
+  const [aiModelId, setAiModelId] = useState<AiModelId>(AI_MODELS[0].id);
   const [image, setImage] = useState<{ dataUri: string; name: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const style = STYLE_PRESETS.find((s) => s.id === styleId) ?? STYLE_PRESETS[0];
+  const effectiveType = modelType ?? style.modelType;
+  const effectivePoly = polycount ?? style.targetPolycount;
+
   const pickImage = (file: File | undefined) => {
     setError(null);
     if (!file) return;
     if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
-      setError("Formato no soportado (png, jpg o webp)");
+      setError("Unsupported format (png, jpg or webp)");
       return;
     }
     if (file.size > MAX_IMAGE_BYTES) {
-      setError("La imagen supera los 20MB");
+      setError("Image is over 20MB");
       return;
     }
     const reader = new FileReader();
@@ -44,11 +56,11 @@ export function GeneratePanel({ onStarted, onDenied, compact = false }: Props) {
   const submit = async () => {
     setError(null);
     if (kind === "text" && !prompt.trim()) {
-      setError("Contanos qué querés crear");
+      setError("Tell us what you want to create");
       return;
     }
     if (kind === "image" && !image) {
-      setError("Subí una imagen primero");
+      setError("Upload an image first");
       return;
     }
     setBusy(true);
@@ -58,6 +70,9 @@ export function GeneratePanel({ onStarted, onDenied, compact = false }: Props) {
         prompt: prompt.trim() || undefined,
         imageDataUri: image?.dataUri,
         styleId,
+        modelType: modelType ?? undefined,
+        targetPolycount: polycount ?? undefined,
+        aiModelId,
       });
       onStarted(gen);
       setPrompt("");
@@ -67,10 +82,10 @@ export function GeneratePanel({ onStarted, onDenied, compact = false }: Props) {
         if (["free_limit_reached", "capacity_reached", "rate_limited"].includes(err.code)) {
           onDenied(err.code);
         } else {
-          setError("No se pudo iniciar la generación. Probá de nuevo.");
+          setError("Could not start the generation. Please try again.");
         }
       } else {
-        setError("Error de conexión");
+        setError("Connection error");
       }
     } finally {
       setBusy(false);
@@ -81,17 +96,17 @@ export function GeneratePanel({ onStarted, onDenied, compact = false }: Props) {
     <div className={`gen-panel ${compact ? "gen-compact" : ""}`}>
       <div className="seg">
         <button className={kind === "text" ? "seg-on" : ""} onClick={() => setKind("text")}>
-          ✦ Texto a 3D
+          ✦ Text to 3D
         </button>
         <button className={kind === "image" ? "seg-on" : ""} onClick={() => setKind("image")}>
-          ◫ Imagen a 3D
+          ◫ Image to 3D
         </button>
       </div>
 
       {kind === "text" ? (
         <textarea
           className="gen-input"
-          placeholder="Describí tu modelo… ej: robot centinela oxidado con un ojo que brilla"
+          placeholder="Describe your model… e.g. rusty sentinel robot with one glowing eye"
           value={prompt}
           maxLength={500}
           rows={compact ? 2 : 4}
@@ -113,13 +128,13 @@ export function GeneratePanel({ onStarted, onDenied, compact = false }: Props) {
           {image ? (
             <>
               <img src={image.dataUri} alt={image.name} />
-              <span className="muted small">{image.name} — click para cambiar</span>
+              <span className="muted small">{image.name} — click to change</span>
             </>
           ) : (
             <>
               <div className="dropzone-icon">⇪</div>
-              <div>Click / arrastrá / pegá una imagen</div>
-              <div className="muted small">png, jpg o webp · máx 20MB</div>
+              <div>Click / drag & drop / paste an image</div>
+              <div className="muted small">png, jpg or webp · max 20MB</div>
             </>
           )}
           <input
@@ -132,23 +147,101 @@ export function GeneratePanel({ onStarted, onDenied, compact = false }: Props) {
         </div>
       )}
 
-      <div className="preset-row">
-        {STYLE_PRESETS.map((s) => (
-          <button
-            key={s.id}
-            className={`chip ${styleId === s.id ? "chip-on" : ""}`}
-            title={s.blurb}
-            onClick={() => setStyleId(s.id)}
-          >
-            {s.label}
-          </button>
-        ))}
+      <div className="field">
+        <label className="field-label">Art style</label>
+        <div className="preset-row">
+          {STYLE_PRESETS.map((s) => (
+            <button
+              key={s.id}
+              className={`chip ${styleId === s.id ? "chip-on" : ""}`}
+              title={s.blurb}
+              onClick={() => {
+                setStyleId(s.id);
+                setModelType(null);
+                setPolycount(null);
+              }}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
       </div>
+
+      {!compact && (
+        <>
+          <div className="field">
+            <label className="field-label">Model type</label>
+            <div className="seg seg-block">
+              <button
+                className={effectiveType === "standard" ? "seg-on" : ""}
+                onClick={() => setModelType("standard")}
+              >
+                Standard
+              </button>
+              <button
+                className={effectiveType === "lowpoly" ? "seg-on" : ""}
+                onClick={() => setModelType("lowpoly")}
+              >
+                Low Polygon
+              </button>
+            </div>
+          </div>
+
+          <div className="field">
+            <label className="field-label">
+              Target polycount{" "}
+              <span className="muted">
+                {effectivePoly ? effectivePoly.toLocaleString("en-US") : "auto"}
+              </span>
+            </label>
+            <input
+              type="range"
+              className="slider"
+              min={POLYCOUNT_MIN}
+              max={POLYCOUNT_MAX}
+              step={500}
+              value={effectivePoly ?? 30000}
+              onChange={(e) => setPolycount(Number(e.target.value))}
+            />
+          </div>
+
+          <div className="field">
+            <label className="field-label">AI model</label>
+            <select
+              className="select"
+              value={aiModelId}
+              onChange={(e) => setAiModelId(e.target.value as AiModelId)}
+            >
+              {AI_MODELS.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="field">
+            <label className="field-label">License</label>
+            <div className="seg seg-block">
+              <button className="seg-on">Public · CC0</button>
+              <button disabled title="Private exports arrive with token access">
+                Private 🔒
+              </button>
+            </div>
+          </div>
+
+          <div className="cost-row">
+            <span className="muted small">≈ 2 min</span>
+            <span className="muted small">·</span>
+            <span className="small">1 free generation</span>
+          </div>
+        </>
+      )}
 
       {error && <div className="form-error">{error}</div>}
 
       <button className="btn-primary" disabled={busy} onClick={submit}>
-        {busy ? "Iniciando…" : "✦ Generar modelo"}
+        {busy ? "Starting…" : "✦ Generate model"}
       </button>
     </div>
   );

@@ -4,9 +4,14 @@ import path from "node:path";
 import { Readable } from "node:stream";
 import {
   ACCEPTED_IMAGE_TYPES,
+  AI_MODELS,
+  MAX_COMMENT_LENGTH,
   MAX_IMAGE_BYTES,
   MAX_PROMPT_LENGTH,
+  POLYCOUNT_MAX,
+  POLYCOUNT_MIN,
   STYLE_PRESETS,
+  type CommentDto,
   type GenerateRequest,
   type MeDto,
 } from "@asst3d/shared";
@@ -61,8 +66,26 @@ export function registerRoutes(app: FastifyInstance, ctx: Ctx): void {
 
     // Validación de input
     if (body.kind !== "text" && body.kind !== "image")
-      return reply.code(400).send({ error: "invalid_input", message: "kind inválido" });
+      return reply.code(400).send({ error: "invalid_input", message: "invalid kind" });
     const style = STYLE_PRESETS.find((s) => s.id === body.styleId) ?? STYLE_PRESETS[0];
+
+    // Optional overrides on top of the preset (validated server-side).
+    const modelType =
+      body.modelType === "standard" || body.modelType === "lowpoly"
+        ? body.modelType
+        : style.modelType;
+    let targetPolycount = style.targetPolycount;
+    if (typeof body.targetPolycount === "number") {
+      if (
+        !Number.isFinite(body.targetPolycount) ||
+        body.targetPolycount < POLYCOUNT_MIN ||
+        body.targetPolycount > POLYCOUNT_MAX
+      )
+        return reply.code(400).send({ error: "invalid_input", message: "invalid polycount" });
+      targetPolycount = Math.round(body.targetPolycount);
+    }
+    const aiModel =
+      AI_MODELS.find((m) => m.id === body.aiModelId)?.meshy ?? AI_MODELS[0].meshy;
 
     let prompt: string | null = null;
     if (body.kind === "text") {
@@ -95,7 +118,7 @@ export function registerRoutes(app: FastifyInstance, ctx: Ctx): void {
       kind: body.kind,
       prompt,
       styleId: style.id,
-      modelType: style.modelType,
+      modelType,
       isPublic: body.isPublic !== false,
     });
 
@@ -104,14 +127,15 @@ export function registerRoutes(app: FastifyInstance, ctx: Ctx): void {
       if (body.kind === "text") {
         taskId = await ctx.meshy.createTextPreview({
           prompt: `${prompt}, ${style.promptSuffix}`,
-          modelType: style.modelType,
-          targetPolycount: style.targetPolycount,
+          modelType,
+          targetPolycount,
+          aiModel,
         });
       } else {
         taskId = await ctx.meshy.createImageTo3D({
           imageDataUri: body.imageDataUri!,
-          modelType: style.modelType,
-          targetPolycount: style.targetPolycount,
+          modelType,
+          targetPolycount,
         });
       }
       repo.updateGeneration(row.id, { meshy_task_id: taskId, status: "processing" });
@@ -146,6 +170,40 @@ export function registerRoutes(app: FastifyInstance, ctx: Ctx): void {
   // ---- galería pública (Discover) ----
   app.get("/api/discover", async () => {
     return repo.listPublic().map((r) => repo.toDto(r));
+  });
+
+  // ---- comments ----
+  app.get("/api/generations/:id/comments", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    if (!repo.getGeneration(id)) return reply.code(404).send({ error: "not_found" });
+    const rows = repo.listComments(id);
+    const dto: CommentDto[] = rows.map((c) => ({
+      id: c.id,
+      authorName: repo.getUser(c.user_id)?.display_name ?? "guest",
+      body: c.body,
+      createdAt: c.created_at,
+    }));
+    return dto;
+  });
+
+  app.post("/api/generations/:id/comments", async (req, reply) => {
+    const deviceId = deviceIdOf(req);
+    if (!deviceId) return reply.code(400).send({ error: "invalid_input" });
+    const { id } = req.params as { id: string };
+    if (!repo.getGeneration(id)) return reply.code(404).send({ error: "not_found" });
+    const { body } = req.body as { body?: string };
+    const text = typeof body === "string" ? body.trim() : "";
+    if (!text || text.length > MAX_COMMENT_LENGTH)
+      return reply.code(400).send({ error: "invalid_input" });
+    const user = repo.upsertUser(deviceId, req.ip);
+    const commentId = repo.addComment(id, user.id, text);
+    const dto: CommentDto = {
+      id: commentId,
+      authorName: user.display_name ?? "guest",
+      body: text,
+      createdAt: Date.now(),
+    };
+    return reply.code(201).send(dto);
   });
 
   // ---- like ----

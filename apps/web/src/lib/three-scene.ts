@@ -12,7 +12,7 @@ export function createStudioScene(): THREE.Scene {
   key.position.set(3, 5, 4);
   const fill = new THREE.DirectionalLight(0xbfd4ff, 1.1);
   fill.position.set(-4, 2, -2);
-  const rim = new THREE.DirectionalLight(0xcaffdd, 1.4);
+  const rim = new THREE.DirectionalLight(0xd8c6ff, 1.4);
   rim.position.set(0, 3, -5);
   scene.add(key, fill, rim, new THREE.AmbientLight(0xffffff, 0.55));
   return scene;

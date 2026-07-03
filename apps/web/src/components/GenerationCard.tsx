@@ -1,15 +1,17 @@
 import { useEffect, useState } from "react";
 import type { GenerationDto } from "@asst3d/shared";
 import { thumbnailFor } from "../lib/thumbs";
+import { downloadUrl } from "../lib/api";
 
 interface Props {
   gen: GenerationDto;
   onOpen: (gen: GenerationDto) => void;
   onLike?: (gen: GenerationDto) => void;
+  compact?: boolean;
 }
 
-/** Tarjeta de la galería: thumbnail (renderizado en cliente si hace falta) + meta. */
-export function GenerationCard({ gen, onOpen, onLike }: Props) {
+/** Gallery card: thumbnail (client-rendered if needed) + meta + hover actions. */
+export function GenerationCard({ gen, onOpen, onLike, compact = false }: Props) {
   const [thumb, setThumb] = useState<string | null>(gen.thumbnailUrl);
 
   useEffect(() => {
@@ -27,18 +29,33 @@ export function GenerationCard({ gen, onOpen, onLike }: Props) {
   }, [gen.thumbnailUrl, gen.viewerUrl]);
 
   return (
-    <article className="card" onClick={() => onOpen(gen)}>
+    <article className={`card ${compact ? "card-compact" : ""}`} onClick={() => onOpen(gen)}>
       <div className="card-media">
         {thumb ? (
-          <img src={thumb} alt={gen.prompt ?? "modelo 3D"} loading="lazy" />
+          <img src={thumb} alt={gen.prompt ?? "3D model"} loading="lazy" />
         ) : (
           <div className="card-media-placeholder">◇</div>
         )}
-        <span className="card-badge">{gen.kind === "text" ? "Texto a 3D" : "Imagen a 3D"}</span>
+        <span className="card-badge">{gen.kind === "text" ? "Text to 3D" : "Image to 3D"}</span>
+        {!compact && gen.status === "done" && (
+          <div className="card-hover">
+            <button className="btn-mini" onClick={(e) => { e.stopPropagation(); onOpen(gen); }}>
+              ✦ View
+            </button>
+            <a
+              className="btn-mini"
+              href={downloadUrl(gen.id, "glb")}
+              download
+              onClick={(e) => e.stopPropagation()}
+            >
+              ⬇ GLB
+            </a>
+          </div>
+        )}
       </div>
       <footer className="card-footer">
         <div className="card-title" title={gen.prompt ?? undefined}>
-          {gen.prompt ?? "Sin título"}
+          {gen.prompt ?? "Untitled"}
         </div>
         <div className="card-meta">
           <span className="card-author">
@@ -53,7 +70,7 @@ export function GenerationCard({ gen, onOpen, onLike }: Props) {
               e.stopPropagation();
               onLike?.(gen);
             }}
-            title="Me gusta"
+            title="Like"
           >
             ♥ {gen.likes}
           </button>

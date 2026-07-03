@@ -1,5 +1,6 @@
 import type {
   ApiErrorCode,
+  CommentDto,
   GenerateRequest,
   GenerationDto,
   MeDto,
@@ -68,3 +69,12 @@ export const uploadThumbnail = (id: string, dataUri: string) =>
 
 export const downloadUrl = (id: string, format: string) =>
   `/api/generations/${id}/download?format=${format}`;
+
+export const listComments = (id: string) =>
+  api<CommentDto[]>(`/api/generations/${id}/comments`);
+
+export const postComment = (id: string, body: string) =>
+  api<CommentDto>(`/api/generations/${id}/comments`, {
+    method: "POST",
+    body: JSON.stringify({ body }),
+  });

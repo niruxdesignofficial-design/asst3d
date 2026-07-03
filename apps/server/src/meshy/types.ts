@@ -16,6 +16,8 @@ export interface TextTo3DOptions {
   prompt: string;
   modelType: "standard" | "lowpoly";
   targetPolycount?: number;
+  /** Meshy ai_model id (e.g. "latest", "meshy-5") */
+  aiModel?: string;
 }
 
 export interface ImageTo3DOptions {

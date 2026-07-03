@@ -13,7 +13,7 @@ interface Props {
   refreshMe: () => void;
 }
 
-/** Workspace de 3 paneles: opciones | resultado | historial (como Meshy). */
+/** 3-panel workspace: options | result | history. */
 export function Workspace({ me, refreshMe }: Props) {
   const [mine, setMine] = useState<GenerationDto[]>([]);
   const [current, setCurrent] = useState<GenerationDto | null>(null);
@@ -29,13 +29,13 @@ export function Workspace({ me, refreshMe }: Props) {
 
   useEffect(refreshMine, [refreshMine]);
 
-  // Si venimos de la home con una generación recién lanzada, seguirla acá.
+  // Coming from the home page with a freshly launched generation: track it here.
   useEffect(() => {
     const focusId = location.state?.focusId;
     if (focusId) getGeneration(focusId).then(setCurrent).catch(() => {});
   }, [location.state?.focusId]);
 
-  // Polling del job activo contra NUESTRO server (nunca contra Meshy).
+  // Poll the active job against OUR server (never Meshy directly).
   useEffect(() => {
     if (!current || current.status === "done" || current.status === "failed") return;
     pollRef.current = window.setInterval(async () => {
@@ -47,7 +47,7 @@ export function Workspace({ me, refreshMe }: Props) {
           refreshMe();
         }
       } catch {
-        /* reintento en el próximo tick */
+        /* retry on next tick */
       }
     }, 1200);
     return () => {
@@ -62,7 +62,7 @@ export function Workspace({ me, refreshMe }: Props) {
   return (
     <main className="ws">
       <aside className="ws-left">
-        <h2 className="ws-heading">Crear</h2>
+        <h2 className="ws-heading">Create</h2>
         <GeneratePanel
           onStarted={(gen) => {
             setCurrent(gen);
@@ -74,8 +74,8 @@ export function Workspace({ me, refreshMe }: Props) {
         {me && (
           <p className="muted small ws-quota">
             {me.hasTokenAccess
-              ? "Acceso con token: generaciones ilimitadas"
-              : `Te quedan ${me.freeRemaining} de ${me.freeLimit} generaciones gratis`}
+              ? "Token access: unlimited generations"
+              : `${me.freeRemaining} of ${me.freeLimit} free generations left`}
           </p>
         )}
       </aside>
@@ -84,22 +84,22 @@ export function Workspace({ me, refreshMe }: Props) {
         {!current && (
           <div className="ws-empty">
             <div className="ws-empty-mark">◆ ▲ ●</div>
-            <h2>¿Qué crearás hoy?</h2>
+            <h2>What will you create today?</h2>
             <p className="muted">
-              Generá un modelo desde texto o imagen. Lo vas a poder rotar, inspeccionar y
-              descargar listo para tu motor de juego.
+              Generate a model from text or an image. Preview it in 3D, inspect the topology and
+              download it ready for your game engine.
             </p>
           </div>
         )}
 
         {current && (current.status === "pending" || current.status === "processing") && (
           <div className="ws-progress">
-            <h3>Generando “{current.prompt ?? "tu modelo"}”…</h3>
+            <h3>Generating “{current.prompt ?? "your model"}”…</h3>
             <div className="bar">
               <div className="bar-fill" style={{ width: `${current.progress}%` }} />
             </div>
             <p className="muted small">
-              {current.progress < 50 ? "Construyendo geometría" : "Aplicando texturas"} ·{" "}
+              {current.progress < 50 ? "Building geometry" : "Applying textures"} ·{" "}
               {current.progress}%
             </p>
           </div>
@@ -107,8 +107,8 @@ export function Workspace({ me, refreshMe }: Props) {
 
         {current?.status === "failed" && (
           <div className="ws-progress">
-            <h3>La generación falló</h3>
-            <p className="form-error">{current.error ?? "Error desconocido"}</p>
+            <h3>Generation failed</h3>
+            <p className="form-error">{current.error ?? "Unknown error"}</p>
           </div>
         )}
 
@@ -116,6 +116,7 @@ export function Workspace({ me, refreshMe }: Props) {
           <div className="ws-result">
             <ModelViewer
               src={current.viewerUrl}
+              showStats
               onSnapshot={
                 current.thumbnailUrl
                   ? undefined
@@ -123,9 +124,9 @@ export function Workspace({ me, refreshMe }: Props) {
               }
             />
             <div className="ws-result-bar">
-              <strong>{current.prompt ?? "Modelo"}</strong>
+              <strong>{current.prompt ?? "Model"}</strong>
               <button className="btn-secondary" onClick={() => setSelected(current)}>
-                Detalles y descarga
+                Details & download
               </button>
             </div>
           </div>
@@ -134,10 +135,10 @@ export function Workspace({ me, refreshMe }: Props) {
 
       <aside className="ws-right">
         <div className="ws-right-head">
-          <h2 className="ws-heading">Mis generaciones</h2>
+          <h2 className="ws-heading">My generations</h2>
           <input
             className="search"
-            placeholder="Buscar…"
+            placeholder="Search my models…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -147,11 +148,14 @@ export function Workspace({ me, refreshMe }: Props) {
             <GenerationCard
               key={g.id}
               gen={g}
+              compact
               onOpen={(gen) => (gen.status === "done" ? setSelected(gen) : setCurrent(gen))}
             />
           ))}
           {filtered.length === 0 && (
-            <p className="muted small">Acá va a aparecer tu historial para volver a descargar.</p>
+            <p className="muted small">
+              Your history lives here — come back any time to re-download your models.
+            </p>
           )}
         </div>
       </aside>

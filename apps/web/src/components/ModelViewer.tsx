@@ -7,20 +7,51 @@ import {
   THREE,
 } from "../lib/three-scene";
 
+export interface MeshStats {
+  triangles: number;
+  vertices: number;
+  meshes: number;
+}
+
 interface Props {
   src: string;
   autoRotate?: boolean;
-  /** callback con un snapshot webp una vez cargado (para subir thumbnail) */
+  /** callback with a webp snapshot once loaded (to upload as thumbnail) */
   onSnapshot?: (dataUri: string) => void;
+  /** callback with mesh stats (triangles/vertices) once loaded */
+  onStats?: (stats: MeshStats) => void;
+  /** show the topology stats panel (like a real inspector) */
+  showStats?: boolean;
 }
 
-/** Visor 3D interactivo: orbitar (drag), zoom (rueda), pan (click derecho). */
-export function ModelViewer({ src, autoRotate = true, onSnapshot }: Props) {
+function computeStats(root: THREE.Object3D): MeshStats {
+  let triangles = 0;
+  let vertices = 0;
+  let meshes = 0;
+  root.traverse((o) => {
+    if (o instanceof THREE.Mesh) {
+      meshes++;
+      const g = o.geometry as THREE.BufferGeometry;
+      const pos = g.getAttribute("position");
+      if (pos) {
+        vertices += pos.count;
+        triangles += g.index ? g.index.count / 3 : pos.count / 3;
+      }
+    }
+  });
+  return { triangles: Math.round(triangles), vertices, meshes };
+}
+
+/** Interactive 3D viewer: orbit (drag), zoom (wheel), pan (right-click). */
+export function ModelViewer({ src, autoRotate = true, onSnapshot, onStats, showStats = false }: Props) {
   const mountRef = useRef<HTMLDivElement>(null);
   const [wireframe, setWireframe] = useState(false);
+  const [spin, setSpin] = useState(autoRotate);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [stats, setStats] = useState<MeshStats | null>(null);
   const modelRef = useRef<THREE.Group | null>(null);
+  const controlsRef = useRef<InstanceType<typeof OrbitControls> | null>(null);
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -28,6 +59,8 @@ export function ModelViewer({ src, autoRotate = true, onSnapshot }: Props) {
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
     mount.appendChild(renderer.domElement);
 
     const scene = createStudioScene();
@@ -40,9 +73,10 @@ export function ModelViewer({ src, autoRotate = true, onSnapshot }: Props) {
     controls.autoRotateSpeed = 1.6;
     controls.minDistance = 1.2;
     controls.maxDistance = 12;
+    controlsRef.current = controls;
 
-    // Piso sutil de referencia
-    const grid = new THREE.GridHelper(8, 16, 0x2c3a2e, 0x1a231c);
+    // Subtle reference floor
+    const grid = new THREE.GridHelper(8, 16, 0x4c3a6e, 0x241b38);
     grid.position.y = -1.05;
     scene.add(grid);
 
@@ -60,6 +94,7 @@ export function ModelViewer({ src, autoRotate = true, onSnapshot }: Props) {
     let disposed = false;
     setLoading(true);
     setError(null);
+    setStats(null);
     loadGlb(src)
       .then((model) => {
         if (disposed) return;
@@ -67,6 +102,9 @@ export function ModelViewer({ src, autoRotate = true, onSnapshot }: Props) {
         scene.add(model);
         modelRef.current = model;
         setLoading(false);
+        const s = computeStats(model);
+        setStats(s);
+        onStats?.(s);
         if (onSnapshot) {
           renderer.render(scene, camera);
           onSnapshot(renderer.domElement.toDataURL("image/webp", 0.82));
@@ -75,7 +113,7 @@ export function ModelViewer({ src, autoRotate = true, onSnapshot }: Props) {
       .catch(() => {
         if (!disposed) {
           setLoading(false);
-          setError("No se pudo cargar el modelo");
+          setError("Could not load this model");
         }
       });
 
@@ -101,7 +139,7 @@ export function ModelViewer({ src, autoRotate = true, onSnapshot }: Props) {
       renderer.dispose();
       mount.removeChild(renderer.domElement);
     };
-  }, [src, autoRotate, onSnapshot]);
+  }, [src, autoRotate, onSnapshot, onStats]);
 
   useEffect(() => {
     modelRef.current?.traverse((o) => {
@@ -114,20 +152,57 @@ export function ModelViewer({ src, autoRotate = true, onSnapshot }: Props) {
     });
   }, [wireframe]);
 
+  useEffect(() => {
+    if (controlsRef.current) controlsRef.current.autoRotate = spin;
+  }, [spin]);
+
+  const fmt = (n: number) => n.toLocaleString("en-US");
+
   return (
     <div className="viewer">
       <div ref={mountRef} className="viewer-canvas" />
-      {loading && <div className="viewer-overlay">Cargando modelo…</div>}
+      {loading && <div className="viewer-overlay">Loading model…</div>}
       {error && <div className="viewer-overlay viewer-error">{error}</div>}
+
+      {showStats && stats && !loading && (
+        <div className="viewer-stats">
+          <div>
+            <span>Topology</span>
+            <strong>Tris</strong>
+          </div>
+          <div>
+            <span>Faces</span>
+            <strong>{fmt(stats.triangles)}</strong>
+          </div>
+          <div>
+            <span>Vertices</span>
+            <strong>{fmt(stats.vertices)}</strong>
+          </div>
+          <div>
+            <span>Meshes</span>
+            <strong>{fmt(stats.meshes)}</strong>
+          </div>
+        </div>
+      )}
+
       <div className="viewer-toolbar">
-        <button
-          className={`chip ${wireframe ? "chip-on" : ""}`}
-          onClick={() => setWireframe((w) => !w)}
-          title="Ver malla"
-        >
-          Wireframe
-        </button>
-        <span className="viewer-hint">Arrastrá para girar · rueda para zoom</span>
+        <div className="viewer-actions">
+          <button
+            className={`chip ${wireframe ? "chip-on" : ""}`}
+            onClick={() => setWireframe((w) => !w)}
+            title="Toggle wireframe"
+          >
+            Wireframe
+          </button>
+          <button
+            className={`chip ${spin ? "chip-on" : ""}`}
+            onClick={() => setSpin((s) => !s)}
+            title="Toggle auto-rotate"
+          >
+            Spin
+          </button>
+        </div>
+        <span className="viewer-hint">Drag to orbit · scroll to zoom</span>
       </div>
     </div>
   );

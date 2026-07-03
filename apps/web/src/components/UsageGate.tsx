@@ -4,24 +4,24 @@ interface Props {
   onDismiss: () => void;
 }
 
-/** Banner de bloqueo cuando el server rechaza una generación. */
+/** Blocking banner when the server denies a generation. */
 export function UsageGate({ code, paymentsEnabled, onDismiss }: Props) {
   let title = "";
   let body = "";
   if (code === "free_limit_reached") {
-    title = "Se te acabaron las generaciones gratis";
+    title = "You're out of free generations";
     body = paymentsEnabled
-      ? "Conectá tu wallet y accedé con el token para seguir generando."
-      : "El acceso con token está llegando pronto. Volvé más tarde para seguir generando.";
+      ? "Connect your wallet and unlock unlimited generations with the token."
+      : "Token access is coming soon. Check back later to keep generating.";
   } else if (code === "capacity_reached") {
-    title = "Capacidad completa";
-    body = "La app llegó a su tope de generaciones de este mes. Probá de nuevo más tarde.";
+    title = "Capacity reached";
+    body = "The app hit its monthly generation cap. Please try again later.";
   } else if (code === "rate_limited") {
-    title = "Muy rápido";
-    body = "Estás generando demasiado seguido. Esperá un momento y probá de nuevo.";
+    title = "Slow down";
+    body = "You're generating too fast. Wait a moment and try again.";
   } else {
-    title = "No se pudo generar";
-    body = "Ocurrió un problema. Probá de nuevo en unos minutos.";
+    title = "Generation failed";
+    body = "Something went wrong. Please try again in a few minutes.";
   }
 
   return (
@@ -31,12 +31,16 @@ export function UsageGate({ code, paymentsEnabled, onDismiss }: Props) {
         <p className="muted">{body}</p>
         <div className="gate-actions">
           {code === "free_limit_reached" && (
-            <button className="btn-primary" disabled={!paymentsEnabled} title={paymentsEnabled ? "" : "Próximamente"}>
-              🔑 Acceso con token {paymentsEnabled ? "" : "(pronto)"}
+            <button
+              className="btn-primary"
+              disabled={!paymentsEnabled}
+              title={paymentsEnabled ? "" : "Coming soon"}
+            >
+              🔑 Token access {paymentsEnabled ? "" : "(soon)"}
             </button>
           )}
           <button className="btn-secondary" onClick={onDismiss}>
-            Entendido
+            Got it
           </button>
         </div>
       </div>
