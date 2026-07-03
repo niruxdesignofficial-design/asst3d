@@ -84,6 +84,29 @@ describe("JobPoller", () => {
     expect(g.progress).toBe(50);
   });
 
+  it("preview progresivo: publica el GLB del preview mientras texturiza", async () => {
+    const persist = async (id: string, urls: Record<string, string>) => ({
+      urls: { ...urls, glb: `db://${id}.glb` },
+      thumbnailUrl: null,
+    });
+    const p = new JobPoller(repo, meshy, 3000, persist);
+    const row = await newTextGen();
+    await repo.updateGeneration(row.id, { meshy_task_id: "p1", status: "processing" });
+    meshy.set("p1", {
+      status: "SUCCEEDED",
+      progress: 100,
+      model_urls: { glb: "https://meshy/preview.glb" },
+    });
+    await p.tick();
+    const g = (await repo.getGeneration(row.id))!;
+    // sigue procesando (refine encadenado) pero el visor ya tiene modelo
+    expect(g.status).toBe("processing");
+    expect(g.stage).toBe("refine");
+    expect(JSON.parse(g.model_urls!).glb).toBe(`db://${row.id}.glb`);
+    const dto = await repo.toDto(g);
+    expect(dto.viewerUrl).toBe(`/api/generations/${g.id}/model.glb`);
+  });
+
   it("al terminar refine guarda las model_urls y marca done", async () => {
     const row = await newTextGen();
     await repo.updateGeneration(row.id, {

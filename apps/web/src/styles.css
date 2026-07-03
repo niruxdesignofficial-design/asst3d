@@ -1433,6 +1433,25 @@ a {
   justify-content: space-between;
   gap: 12px;
 }
+.texturing-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--accent-2);
+  border: 1px solid rgba(167, 139, 250, 0.4);
+  border-radius: 999px;
+  padding: 7px 14px;
+  white-space: nowrap;
+}
+.texturing-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--glow);
+  animation: pulse 1.4s ease-in-out infinite;
+}
 .ws-right-head {
   display: flex;
   flex-direction: column;

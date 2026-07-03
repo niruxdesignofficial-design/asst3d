@@ -35,10 +35,18 @@ interface Props {
   compact?: boolean;
   /** prefill the prompt (e.g. suggestion chips); updates when it changes */
   initialPrompt?: string;
+  /** hay proveedor Fast configurado en el server; si no, el selector se oculta */
+  fastAvailable?: boolean;
 }
 
 /** Generation form (text or image). Whether it CAN generate is always the server's call. */
-export function GeneratePanel({ onStarted, onDenied, compact = false, initialPrompt }: Props) {
+export function GeneratePanel({
+  onStarted,
+  onDenied,
+  compact = false,
+  initialPrompt,
+  fastAvailable = false,
+}: Props) {
   const [kind, setKind] = useState<GenerationKind>("text");
   const [prompt, setPrompt] = useState("");
   const [styleId, setStyleId] = useState(STYLE_PRESETS[0].id);
@@ -98,7 +106,7 @@ export function GeneratePanel({ onStarted, onDenied, compact = false, initialPro
         modelType: modelType ?? undefined,
         targetPolycount: polycount ?? undefined,
         aiModelId,
-        speed,
+        speed: fastAvailable ? speed : "quality",
       });
       onStarted(gen);
       setPrompt("");
@@ -182,21 +190,23 @@ export function GeneratePanel({ onStarted, onDenied, compact = false, initialPro
         </div>
       )}
 
-      <div className="field">
-        <label className="field-label">Speed</label>
-        <div className="seg seg-block">
-          {SPEED_OPTIONS.map((s) => (
-            <button
-              key={s.id}
-              className={speed === s.id ? "seg-on" : ""}
-              title={s.blurb}
-              onClick={() => setSpeed(s.id)}
-            >
-              {s.label}
-            </button>
-          ))}
+      {fastAvailable && (
+        <div className="field">
+          <label className="field-label">Speed</label>
+          <div className="seg seg-block">
+            {SPEED_OPTIONS.map((s) => (
+              <button
+                key={s.id}
+                className={speed === s.id ? "seg-on" : ""}
+                title={s.blurb}
+                onClick={() => setSpeed(s.id)}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="field">
         <label className="field-label">Art style</label>
@@ -282,7 +292,9 @@ export function GeneratePanel({ onStarted, onDenied, compact = false, initialPro
           </div>
 
           <div className="cost-row">
-            <span className="muted small">{speed === "fast" ? "≈ 15-30 sec" : "≈ 2-6 min"}</span>
+            <span className="muted small">
+              {fastAvailable && speed === "fast" ? "≈ 15-30 sec" : "≈ 2-6 min · preview in ~half"}
+            </span>
             <span className="muted small">·</span>
             <span className="small">1 free generation</span>
           </div>

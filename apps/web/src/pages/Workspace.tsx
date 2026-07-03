@@ -65,6 +65,7 @@ export function Workspace({ me, refreshMe }: Props) {
       <aside className="ws-left">
         <h2 className="ws-heading">Create</h2>
         <GeneratePanel
+          fastAvailable={!!me?.fastProvider}
           onStarted={(gen) => {
             setCurrent(gen);
             refreshMine();
@@ -98,7 +99,9 @@ export function Workspace({ me, refreshMe }: Props) {
           </div>
         )}
 
-        {current && (current.status === "pending" || current.status === "processing") && (
+        {current &&
+          (current.status === "pending" || current.status === "processing") &&
+          !current.viewerUrl && (
           <div className="ws-progress">
             <h3>Generating “{current.prompt ?? "your model"}”…</h3>
             <div className="bar">
@@ -131,22 +134,31 @@ export function Workspace({ me, refreshMe }: Props) {
           </div>
         )}
 
-        {current?.status === "done" && current.viewerUrl && (
+        {(current?.status === "done" ||
+          (current?.status === "processing" && current.viewerUrl)) &&
+          current?.viewerUrl && (
           <div className="ws-result">
             <ModelViewer
-              src={current.viewerUrl}
+              // cache-bust cuando el refine reemplaza la geometría por la versión texturizada
+              src={`${current.viewerUrl}?v=${current.status === "done" ? "textured" : "preview"}`}
               showStats
               onSnapshot={
-                current.thumbnailUrl
+                current.status !== "done" || current.thumbnailUrl
                   ? undefined
                   : (uri) => uploadThumbnail(current.id, uri).catch(() => {})
               }
             />
             <div className="ws-result-bar">
               <strong>{current.prompt ?? "Model"}</strong>
-              <button className="btn-secondary" onClick={() => setSelected(current)}>
-                Details & download
-              </button>
+              {current.status === "done" ? (
+                <button className="btn-secondary" onClick={() => setSelected(current)}>
+                  Details & download
+                </button>
+              ) : (
+                <span className="texturing-badge">
+                  <span className="texturing-dot" /> Applying textures… {current.progress}%
+                </span>
+              )}
             </div>
           </div>
         )}

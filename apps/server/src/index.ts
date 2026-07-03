@@ -48,8 +48,14 @@ const poller = new JobPoller(
   fast ? { fast } : undefined
 );
 
+const fastProvider = !fast
+  ? undefined
+  : config.stabilityApiKey
+    ? "stability"
+    : "3daistudio";
+
 await seedDiscover(repo);
-registerRoutes(app, { repo, meshy, usage, fast });
+registerRoutes(app, { repo, meshy, usage, fast, fastProvider });
 poller.start();
 
 // Deploy de un solo servicio: si existe el build del frontend, servirlo desde acá.

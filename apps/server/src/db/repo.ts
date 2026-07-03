@@ -263,8 +263,8 @@ export class Repo {
         : row.thumbnail_url
           ? `/api/generations/${row.id}/thumbnail`
           : null,
-      viewerUrl:
-        row.status === "done" && urls.glb ? `/api/generations/${row.id}/model.glb` : null,
+      // Disponible apenas hay GLB (aunque siga texturizando): preview progresivo.
+      viewerUrl: urls.glb ? `/api/generations/${row.id}/model.glb` : null,
       error: row.error,
       isPublic: row.is_public === 1,
       authorName: user?.display_name ?? authorName,

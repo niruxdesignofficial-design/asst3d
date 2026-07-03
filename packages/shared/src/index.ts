@@ -124,6 +124,8 @@ export interface MeDto {
   /** true if the user has paid (token) access */
   hasTokenAccess: boolean;
   walletAddress: string | null;
+  /** proveedor del modo Fast si hay alguno configurado; null = todo va al default */
+  fastProvider: string | null;
 }
 
 export interface GenerateRequest {

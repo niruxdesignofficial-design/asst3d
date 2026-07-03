@@ -100,12 +100,25 @@ export class JobPoller {
       }
       case "SUCCEEDED": {
         if (client.twoStage && row.kind === "text" && row.stage === "preview") {
+          // Publicar la geometría del preview YA (el visor la muestra mientras
+          // el refine aplica texturas de fondo — se siente el doble de rápido).
+          let previewUrls = (task.model_urls ?? {}) as Record<string, string>;
+          if (previewUrls.glb && this.persist) {
+            try {
+              const persisted = await this.persist(row.id, { glb: previewUrls.glb }, null);
+              previewUrls = persisted.urls;
+            } catch {
+              /* si falla la persistencia del preview, seguimos sin publicarlo */
+              previewUrls = {};
+            }
+          }
           // Encadenar refine para conseguir texturas.
           const refineId = await client.createTextRefine(row.meshy_task_id);
           await this.repo.updateGeneration(row.id, {
             stage: "refine",
             meshy_task_id: refineId,
             progress: 50,
+            ...(previewUrls.glb ? { model_urls: JSON.stringify(previewUrls) } : {}),
           });
           return;
         }

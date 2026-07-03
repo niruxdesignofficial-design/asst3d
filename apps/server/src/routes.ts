@@ -26,8 +26,10 @@ interface Ctx {
   repo: Repo;
   meshy: MeshyClient;
   usage: UsageControl;
-  /** cliente del modo Fast (~30-60s); undefined si no hay key de 3D AI Studio */
+  /** cliente del modo Fast; undefined = todo va al proveedor default */
   fast?: MeshyClient;
+  /** nombre del proveedor fast configurado (para la UI), o undefined */
+  fastProvider?: string;
 }
 
 function deviceIdOf(req: FastifyRequest): string | null {
@@ -57,6 +59,7 @@ export function registerRoutes(app: FastifyInstance, ctx: Ctx): void {
       paymentsEnabled: config.paymentsEnabled,
       hasTokenAccess: user.token_access === 1,
       walletAddress: user.wallet_address,
+      fastProvider: ctx.fastProvider ?? null,
     };
     return me;
   });
