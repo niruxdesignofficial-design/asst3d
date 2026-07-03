@@ -27,7 +27,7 @@ export default function App() {
         <div className="footer-grid">
           <div className="footer-brand">
             <div className="nav-logo">
-              <img src="/logo.svg" alt="" className="nav-logo-img" /> Formora
+              <img src="/logo.png" alt="" className="nav-logo-img" /> Formora
             </div>
             <p className="muted small">
               AI 3D model generation for game developers. Describe it, preview it, ship it.
