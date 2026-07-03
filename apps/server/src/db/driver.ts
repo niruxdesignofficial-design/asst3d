@@ -159,6 +159,7 @@ const SQLITE_COLUMN_MIGRATIONS: string[] = [
   `ALTER TABLE generations ADD COLUMN provider TEXT`,
   `ALTER TABLE generations ADD COLUMN reports INTEGER NOT NULL DEFAULT 0`,
   `ALTER TABLE users ADD COLUMN banned INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE generations ADD COLUMN variants TEXT`,
 ];
 
 // Postgres: DDL equivalente (BIGINT para timestamps en ms, BIGSERIAL para ids).
@@ -255,6 +256,7 @@ export async function openDriver(opts: OpenOptions): Promise<DbDriver> {
     for (const sql of [
       `ALTER TABLE generations ADD COLUMN IF NOT EXISTS reports INTEGER NOT NULL DEFAULT 0`,
       `ALTER TABLE users ADD COLUMN IF NOT EXISTS banned INTEGER NOT NULL DEFAULT 0`,
+      `ALTER TABLE generations ADD COLUMN IF NOT EXISTS variants TEXT`,
     ])
       await driver.run(sql);
     return driver;

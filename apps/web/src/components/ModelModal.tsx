@@ -7,14 +7,18 @@ import {
   type GenerationDto,
 } from "@asst3d/shared";
 import {
+  createVariant,
   deleteGeneration,
   downloadUrl,
+  getGeneration,
   likeGeneration,
   listComments,
   postComment,
   reportGeneration,
+  retextureGeneration,
   updateGeneration,
 } from "../lib/api";
+import { useNavigate } from "react-router-dom";
 import { ModelViewer } from "./ModelViewer";
 
 interface Props {
@@ -31,6 +35,52 @@ export function ModelModal({ gen, onClose, onChanged }: Props) {
   const [isPublic, setIsPublic] = useState(gen.isPublic);
   const [editing, setEditing] = useState(false);
   const [ownerBusy, setOwnerBusy] = useState(false);
+  const [variants, setVariants] = useState<string[]>(gen.variants ?? []);
+  const [variantBusy, setVariantBusy] = useState<string | null>(null);
+  const [retexOpen, setRetexOpen] = useState(false);
+  const [retexPrompt, setRetexPrompt] = useState("");
+  const navigate = useNavigate();
+
+  const optimize = async (preset: "mobile" | "pc") => {
+    setVariantBusy(preset);
+    try {
+      await createVariant(gen.id, preset);
+      // poll hasta que la variante quede cacheada (remesh tarda ~30-90s)
+      for (let i = 0; i < 40; i++) {
+        await new Promise((r) => setTimeout(r, 4000));
+        const fresh = await getGeneration(gen.id);
+        if (fresh.variants.includes(preset)) {
+          setVariants(fresh.variants);
+          break;
+        }
+      }
+    } catch {
+      /* el server ya hizo refund si falló */
+    } finally {
+      setVariantBusy(null);
+    }
+  };
+
+  const retexture = async () => {
+    const style = retexPrompt.trim();
+    if (!style) return;
+    setOwnerBusy(true);
+    try {
+      const created = await retextureGeneration(gen.id, style);
+      onChanged?.();
+      onClose();
+      navigate("/workspace", { state: { focusId: created.id } });
+    } catch {
+      setRetexOpen(false);
+    } finally {
+      setOwnerBusy(false);
+    }
+  };
+
+  const remix = () => {
+    onClose();
+    navigate("/workspace", { state: { remixPrompt: gen.prompt ?? "" } });
+  };
 
   const saveTitle = async () => {
     const t = title.trim();
@@ -210,7 +260,75 @@ export function ModelModal({ gen, onClose, onChanged }: Props) {
                 );
               })}
             </div>
+
+            {gen.supportsVariants && (
+              <div className="variant-row">
+                {(["mobile", "pc"] as const).map((preset) =>
+                  variants.includes(preset) ? (
+                    <a
+                      key={preset}
+                      className="btn-mini"
+                      href={`${downloadUrl(gen.id, "glb")}&preset=${preset}`}
+                      download
+                    >
+                      ⬇ {preset === "mobile" ? "Mobile ~5k" : "PC ~30k"}
+                    </a>
+                  ) : gen.isMine ? (
+                    <button
+                      key={preset}
+                      className="btn-mini"
+                      disabled={variantBusy !== null}
+                      title="Optimized remesh — uses 1 generation"
+                      onClick={() => optimize(preset)}
+                    >
+                      {variantBusy === preset
+                        ? "Optimizing…"
+                        : `⚙ ${preset === "mobile" ? "Mobile ~5k" : "PC ~30k"}`}
+                    </button>
+                  ) : null
+                )}
+              </div>
+            )}
           </div>
+
+          {gen.isMine && gen.supportsVariants && (
+            <div className="modal-section">
+              <h3>Iterate</h3>
+              <div className="owner-row">
+                <button className="btn-mini" onClick={remix} title="New generation, same prompt">
+                  🎲 Remix
+                </button>
+                <button
+                  className="btn-mini"
+                  onClick={() => setRetexOpen((v) => !v)}
+                  title="New textures on this same mesh — uses 1 generation"
+                >
+                  🎨 Retexture
+                </button>
+              </div>
+              {retexOpen && (
+                <div className="promo-row" style={{ marginTop: 10 }}>
+                  <input
+                    className="search promo-input"
+                    style={{ textTransform: "none" }}
+                    placeholder="New style… e.g. gold plated, sci-fi neon"
+                    value={retexPrompt}
+                    maxLength={300}
+                    autoFocus
+                    onChange={(e) => setRetexPrompt(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && retexture()}
+                  />
+                  <button
+                    className="btn-mini"
+                    disabled={ownerBusy || !retexPrompt.trim()}
+                    onClick={retexture}
+                  >
+                    Go
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="modal-actions">
             <button

@@ -80,6 +80,18 @@ export const listDiscover = (opts: { q?: string; sort?: string; page?: number } 
 export const reportGeneration = (id: string) =>
   api<{ ok: true; reports: number }>(`/api/generations/${id}/report`, { method: "POST" });
 
+export const createVariant = (id: string, preset: "mobile" | "pc") =>
+  api<{ ok: true; ready: boolean }>(`/api/generations/${id}/variant`, {
+    method: "POST",
+    body: JSON.stringify({ preset }),
+  });
+
+export const retextureGeneration = (id: string, stylePrompt: string) =>
+  api<GenerationDto>(`/api/generations/${id}/retexture`, {
+    method: "POST",
+    body: JSON.stringify({ stylePrompt }),
+  });
+
 export const likeGeneration = (id: string) =>
   api<{ likes: number }>(`/api/generations/${id}/like`, { method: "POST" });
 

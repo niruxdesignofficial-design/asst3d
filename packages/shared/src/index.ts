@@ -104,6 +104,10 @@ export interface GenerationDto {
   authorName: string;
   /** true si el modelo pertenece al usuario del request */
   isMine: boolean;
+  /** presets de export ya cacheados (mobile/pc) */
+  variants: string[];
+  /** true si soporta post-procesado Meshy (remesh/retexture) */
+  supportsVariants: boolean;
   likes: number;
   createdAt: number;
 }

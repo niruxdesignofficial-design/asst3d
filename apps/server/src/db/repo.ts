@@ -32,6 +32,8 @@ export interface GenerationRow {
   progress: number;
   meshy_task_id: string | null;
   provider: string | null;
+  /** JSON {mobile: ref, pc: ref} — variantes remesheadas listas para descargar */
+  variants: string | null;
   model_urls: string | null;
   thumbnail_url: string | null;
   thumbnail_data: string | null;
@@ -310,6 +312,7 @@ export class Repo {
       progress: number;
       meshy_task_id: string | null;
       model_urls: string | null;
+      variants: string | null;
       thumbnail_url: string | null;
       thumbnail_data: string | null;
       error: string | null;
@@ -374,6 +377,12 @@ export class Repo {
       isPublic: row.is_public === 1,
       authorName: user?.display_name ?? "guest",
       isMine: !!requesterId && row.user_id === requesterId,
+      variants: row.variants ? Object.keys(JSON.parse(row.variants)) : [],
+      supportsVariants:
+        row.status === "done" &&
+        !!row.meshy_task_id &&
+        row.provider !== "fast" &&
+        !/^(seed-|mock-|stab-)/.test(row.meshy_task_id),
       likes: row.likes,
       createdAt: Number(row.created_at),
     };

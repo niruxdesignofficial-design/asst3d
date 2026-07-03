@@ -610,6 +610,13 @@ a {
   color: var(--danger);
   font-size: 0.85rem;
 }
+.variant-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
 /* load more + report + admin */
 .load-more {
   text-align: center;

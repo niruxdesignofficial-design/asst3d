@@ -79,7 +79,44 @@ export class RealMeshyClient implements MeshyClient {
     return r.result;
   }
 
+  /**
+   * Remesh a un polycount objetivo sobre una task terminada (export presets).
+   * Devuelve el id con prefijo para que getTask sepa qué endpoint consultar.
+   */
+  async createRemesh(inputTaskId: string, targetPolycount: number): Promise<string> {
+    const r = await meshyFetch<{ result: string }>("/openapi/v1/remesh", {
+      method: "POST",
+      body: JSON.stringify({
+        input_task_id: inputTaskId,
+        target_formats: ["glb"],
+        topology: "triangle",
+        target_polycount: targetPolycount,
+      }),
+    });
+    return `remesh:${r.result}`;
+  }
+
+  /** Nuevas texturas sobre una malla existente (mucho más barato que regenerar). */
+  async createRetexture(inputTaskId: string, stylePrompt: string): Promise<string> {
+    const r = await meshyFetch<{ result: string }>("/openapi/v1/retexture", {
+      method: "POST",
+      body: JSON.stringify({
+        input_task_id: inputTaskId,
+        text_style_prompt: stylePrompt.slice(0, 600),
+        ai_model: "meshy-5",
+        enable_original_uv: true,
+        target_formats: ["glb", "fbx", "obj", "usdz"],
+      }),
+    });
+    return `retex:${r.result}`;
+  }
+
   async getTask(taskId: string, kind: "text" | "image"): Promise<MeshyTask> {
+    // Los ids con prefijo vienen de las tasks de post-procesado.
+    if (taskId.startsWith("remesh:"))
+      return meshyFetch<MeshyTask>(`/openapi/v1/remesh/${taskId.slice("remesh:".length)}`);
+    if (taskId.startsWith("retex:"))
+      return meshyFetch<MeshyTask>(`/openapi/v1/retexture/${taskId.slice("retex:".length)}`);
     const path =
       kind === "text"
         ? `/openapi/v2/text-to-3d/${taskId}`

@@ -22,7 +22,7 @@ export function Workspace({ me, refreshMe }: Props) {
   const [gate, setGate] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const pollRef = useRef<number | null>(null);
-  const location = useLocation() as { state?: { focusId?: string } };
+  const location = useLocation() as { state?: { focusId?: string; remixPrompt?: string } };
 
   const refreshMine = useCallback(() => {
     listMine().then(setMine).catch(() => {});
@@ -66,6 +66,7 @@ export function Workspace({ me, refreshMe }: Props) {
         <h2 className="ws-heading">Create</h2>
         <GeneratePanel
           fastAvailable={!!me?.fastProvider}
+          initialPrompt={location.state?.remixPrompt}
           onStarted={(gen) => {
             setCurrent(gen);
             refreshMine();

@@ -23,6 +23,7 @@ import { resolveSampleUrl } from "./meshy/mock.js";
 import { getStorage, isStoredRef } from "./storage.js";
 import { createSession, issueNonce, verifySession, verifyWalletSignature } from "./auth.js";
 import { findBlockedTerm } from "./moderation.js";
+import { EXPORT_PRESETS, isVariantPending, startVariant, type ExportPreset } from "./variants.js";
 
 interface Ctx {
   repo: Repo;
@@ -444,6 +445,93 @@ export function registerRoutes(app: FastifyInstance, ctx: Ctx): void {
     return { ok: true };
   });
 
+  // ---- export presets: remesh a Mobile/PC (dueño; consume 1 del cupo) ----
+  app.post("/api/generations/:id/variant", async (req, reply) => {
+    const userId = effectiveUserIdOf(req);
+    if (!userId) return reply.code(400).send({ error: "invalid_input" });
+    const { id } = req.params as { id: string };
+    const { preset } = req.body as { preset?: string };
+    if (preset !== "mobile" && preset !== "pc")
+      return reply.code(400).send({ error: "invalid_input" });
+    const row = await repo.getGeneration(id);
+    if (!row) return reply.code(404).send({ error: "not_found" });
+    if (row.user_id !== userId) return reply.code(403).send({ error: "not_owner" });
+    if (row.status !== "done" || !row.meshy_task_id || row.provider === "fast" ||
+        /^(seed-|mock-|stab-)/.test(row.meshy_task_id))
+      return reply.code(400).send({ error: "unsupported_model" });
+    const existing = row.variants ? JSON.parse(row.variants) : {};
+    if (existing[preset]) return { ok: true, ready: true };
+    if (isVariantPending(id, preset as ExportPreset)) return { ok: true, ready: false };
+
+    // el remesh gasta créditos del proveedor: cuenta como 1 generación del cupo
+    const user = (await repo.getUser(userId))!;
+    const deny = await usage.checkGenerate(user, req.ip);
+    if (deny) return reply.code(deny === "rate_limited" ? 429 : 402).send({ error: deny });
+    await usage.consume(user, req.ip, `variant:${id}:${preset}`);
+
+    try {
+      await startVariant(repo, ctx.meshy, id, preset as ExportPreset, () =>
+        repo.refundUsage(userId)
+      );
+    } catch (err) {
+      await repo.refundUsage(userId);
+      return reply.code(502).send({ error: "upstream_failed" });
+    }
+    return { ok: true, ready: false };
+  });
+
+  // ---- retexture: nuevo estilo sobre la misma malla (dueño; 1 del cupo) ----
+  app.post("/api/generations/:id/retexture", async (req, reply) => {
+    const userId = effectiveUserIdOf(req);
+    if (!userId) return reply.code(400).send({ error: "invalid_input" });
+    const { id } = req.params as { id: string };
+    const { stylePrompt } = req.body as { stylePrompt?: string };
+    const style = (stylePrompt ?? "").trim();
+    if (!style || style.length > 300)
+      return reply.code(400).send({ error: "invalid_input" });
+    if (findBlockedTerm(style))
+      return reply.code(400).send({ error: "blocked_prompt" });
+    const row = await repo.getGeneration(id);
+    if (!row) return reply.code(404).send({ error: "not_found" });
+    if (row.user_id !== userId) return reply.code(403).send({ error: "not_owner" });
+    if (row.status !== "done" || !row.meshy_task_id || row.provider === "fast" ||
+        /^(seed-|mock-|stab-)/.test(row.meshy_task_id))
+      return reply.code(400).send({ error: "unsupported_model" });
+
+    const user = (await repo.getUser(userId))!;
+    const deny = await usage.checkGenerate(user, req.ip);
+    if (deny === "rate_limited") return reply.code(429).send({ error: deny });
+    if (deny) return reply.code(402).send({ error: deny });
+
+    const newRow = await repo.createGeneration({
+      userId,
+      kind: "text",
+      prompt: `${row.prompt ?? "model"} — ${style}`,
+      styleId: row.style_id,
+      modelType: row.model_type,
+      isPublic: row.is_public === 1,
+      provider: row.provider ?? undefined,
+    });
+    try {
+      if (!ctx.meshy.createRetexture) throw new Error("provider does not support retexture");
+      const taskId = await ctx.meshy.createRetexture(row.meshy_task_id, style);
+      // una sola etapa: sin stage preview, el poller la cierra al SUCCEEDED
+      await repo.updateGeneration(newRow.id, {
+        meshy_task_id: taskId,
+        status: "processing",
+        stage: null,
+      });
+    } catch (err) {
+      await repo.updateGeneration(newRow.id, {
+        status: "failed",
+        error: String((err as Error).message ?? err).slice(0, 300),
+      });
+      return reply.code(502).send({ error: "upstream_failed" });
+    }
+    await usage.consume(user, req.ip, newRow.id);
+    return reply.code(201).send(await repo.toDto((await repo.getGeneration(newRow.id))!, userId));
+  });
+
   // ---- like ----
   app.post("/api/generations/:id/like", async (req, reply) => {
     const { id } = req.params as { id: string };
@@ -484,14 +572,23 @@ export function registerRoutes(app: FastifyInstance, ctx: Ctx): void {
     const { id } = req.params as { id: string };
     const { format } = req.query as { format?: string };
     const fmt = (format ?? "glb").toLowerCase();
+    const { preset } = req.query as { preset?: string };
     const row = await repo.getGeneration(id);
     if (!row?.model_urls) return reply.code(404).send({ error: "not_found" });
-    const urls = JSON.parse(row.model_urls) as Record<string, string>;
-    const url = urls[fmt];
+    let url: string | undefined;
+    let suffix = fmt;
+    if (preset === "mobile" || preset === "pc") {
+      const variants = row.variants ? (JSON.parse(row.variants) as Record<string, string>) : {};
+      url = variants[preset];
+      suffix = `${preset}.glb`;
+    } else {
+      const urls = JSON.parse(row.model_urls) as Record<string, string>;
+      url = urls[fmt];
+    }
     if (!url) return reply.code(404).send({ error: "not_found" });
     reply.header(
       "Content-Disposition",
-      `attachment; filename="formora-${id.slice(0, 8)}.${fmt}"`
+      `attachment; filename="formora-${id.slice(0, 8)}.${suffix}"`
     );
     return streamModel(reply, url, "application/octet-stream");
   });

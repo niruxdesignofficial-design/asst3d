@@ -46,4 +46,7 @@ export interface MeshyClient {
   getTask(taskId: string, kind: "text" | "image"): Promise<MeshyTask>;
   /** Créditos restantes de la cuenta Meshy */
   getBalance(): Promise<number>;
+  /** Post-procesado (solo proveedores que lo soportan, hoy Meshy) */
+  createRemesh?(inputTaskId: string, targetPolycount: number): Promise<string>;
+  createRetexture?(inputTaskId: string, stylePrompt: string): Promise<string>;
 }
