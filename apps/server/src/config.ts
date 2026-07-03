@@ -19,6 +19,18 @@ function int(name: string, def: number): number {
 }
 
 const meshyKey = process.env.MESHY_API_KEY?.trim() || "";
+const threedaiKey = process.env.THREEDAI_API_KEY?.trim() || "";
+
+// Proveedor de generación: explícito por env, o inferido por qué key hay cargada.
+type Provider = "mock" | "meshy" | "3daistudio";
+function resolveProvider(): Provider {
+  const p = process.env.PROVIDER?.trim().toLowerCase();
+  if (p === "mock" || p === "meshy" || p === "3daistudio") return p;
+  if (threedaiKey) return "3daistudio";
+  if (meshyKey) return "meshy";
+  return "mock";
+}
+const provider = resolveProvider();
 
 export const config = {
   port: int("PORT", 8787),
@@ -31,8 +43,12 @@ export const config = {
 
   meshyApiKey: meshyKey,
   meshyBaseUrl: "https://api.meshy.ai",
-  // Mock automático si no hay key: nunca rompe ni gasta créditos por accidente.
-  meshyMock: process.env.MESHY_MOCK === "true" || meshyKey === "",
+  threedaiApiKey: threedaiKey,
+  threedaiBaseUrl: "https://api.3daistudio.com",
+  provider,
+  // Mock si no hay ninguna key (o PROVIDER=mock / MESHY_MOCK=true legacy):
+  // nunca rompe ni gasta créditos por accidente.
+  meshyMock: provider === "mock" || process.env.MESHY_MOCK === "true",
 
   freeGenerationsPerUser: int("FREE_GENERATIONS_PER_USER", 3),
   globalMonthlyCap: int("GLOBAL_MONTHLY_CAP", 200),

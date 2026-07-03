@@ -7,6 +7,8 @@ import { openDb } from "./db/index.js";
 import { Repo } from "./db/repo.js";
 import { RealMeshyClient } from "./meshy/client.js";
 import { MockMeshyClient } from "./meshy/mock.js";
+import { ThreeDAIClient } from "./meshy/threedai.js";
+import { persistModels } from "./persist.js";
 import { UsageControl } from "./limits.js";
 import { JobPoller } from "./poller.js";
 import { registerRoutes } from "./routes.js";
@@ -19,9 +21,14 @@ const app = Fastify({
 
 const db = openDb();
 const repo = new Repo(db);
-const meshy = config.meshyMock ? new MockMeshyClient() : new RealMeshyClient();
+const meshy =
+  config.provider === "3daistudio"
+    ? new ThreeDAIClient()
+    : config.provider === "meshy"
+      ? new RealMeshyClient()
+      : new MockMeshyClient();
 const usage = new UsageControl(repo, meshy, config);
-const poller = new JobPoller(repo, meshy, config.meshyMock ? 1000 : 3000);
+const poller = new JobPoller(repo, meshy, config.meshyMock ? 1000 : 4000, persistModels);
 
 seedDiscover(repo);
 registerRoutes(app, { repo, meshy, usage });

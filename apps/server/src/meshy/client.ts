@@ -24,6 +24,8 @@ async function meshyFetch<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export class RealMeshyClient implements MeshyClient {
+  readonly twoStage = true;
+
   async createTextPreview(opts: TextTo3DOptions): Promise<string> {
     const body: Record<string, unknown> = {
       mode: "preview",

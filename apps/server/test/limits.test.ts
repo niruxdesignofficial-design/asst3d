@@ -5,6 +5,7 @@ import { UsageControl, type LimitsConfig } from "../src/limits.js";
 import type { MeshyClient, MeshyTask } from "../src/meshy/types.js";
 
 class FakeMeshy implements MeshyClient {
+  readonly twoStage = true;
   balance = 1000;
   tasks = new Map<string, MeshyTask>();
   private seq = 0;

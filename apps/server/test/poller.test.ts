@@ -5,6 +5,7 @@ import { JobPoller } from "../src/poller.js";
 import type { MeshyClient, MeshyTask } from "../src/meshy/types.js";
 
 class ScriptedMeshy implements MeshyClient {
+  twoStage = true;
   tasks = new Map<string, MeshyTask>();
   refineCreated: string[] = [];
   private seq = 0;
@@ -127,6 +128,18 @@ describe("JobPoller", () => {
     expect(meshy.refineCreated).toHaveLength(0);
   });
 
+  it("proveedor de un paso (twoStage=false): texto termina sin encadenar refine", async () => {
+    meshy.twoStage = false; // como 3D AI Studio
+    const row = newTextGen();
+    repo.updateGeneration(row.id, { meshy_task_id: "p1", status: "processing" });
+    meshy.set("p1", { status: "SUCCEEDED", progress: 100, model_urls: { glb: "https://x/one.glb" } });
+    await poller.tick();
+    const g = repo.getGeneration(row.id)!;
+    expect(g.status).toBe("done");
+    expect(meshy.refineCreated).toHaveLength(0);
+    expect(JSON.parse(g.model_urls!).glb).toBe("https://x/one.glb");
+  });
+
   it("marca failed con el mensaje de error de Meshy", async () => {
     const row = newTextGen();
     repo.updateGeneration(row.id, { meshy_task_id: "p1", status: "processing" });
@@ -137,12 +150,32 @@ describe("JobPoller", () => {
     expect(g.error).toBe("nsfw prompt");
   });
 
-  it("si Meshy tira error de red, el job falla controladamente (no explota el tick)", async () => {
+  it("tolera errores de red transitorios y recién falla tras varios seguidos", async () => {
     const row = newTextGen();
     repo.updateGeneration(row.id, { meshy_task_id: "desconocida", status: "processing" });
-    await poller.tick(); // getTask lanza -> advance captura
+    // Los primeros ticks con error NO matan el job (transitorios)...
+    for (let i = 0; i < 4; i++) {
+      await poller.tick();
+      expect(repo.getGeneration(row.id)!.status).toBe("processing");
+    }
+    // ...el quinto error consecutivo sí.
+    await poller.tick();
     const g = repo.getGeneration(row.id)!;
     expect(g.status).toBe("failed");
     expect(g.error).toContain("unknown task");
+  });
+
+  it("un error transitorio no acumula si después se recupera", async () => {
+    const row = newTextGen();
+    repo.updateGeneration(row.id, { meshy_task_id: "flaky", status: "processing" });
+    await poller.tick(); // error 1 (task desconocida)
+    expect(repo.getGeneration(row.id)!.status).toBe("processing");
+    meshy.set("flaky", { status: "IN_PROGRESS", progress: 40 }); // se recupera
+    await poller.tick();
+    expect(repo.getGeneration(row.id)!.progress).toBeGreaterThan(0);
+    // el contador se reseteó: harían falta 5 errores nuevos para fallar
+    meshy.tasks.delete("flaky");
+    for (let i = 0; i < 4; i++) await poller.tick();
+    expect(repo.getGeneration(row.id)!.status).toBe("processing");
   });
 });

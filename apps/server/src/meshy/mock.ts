@@ -15,6 +15,7 @@ import type {
  * de muestra servido por el propio server en /api/samples/<archivo>.
  */
 export class MockMeshyClient implements MeshyClient {
+  readonly twoStage = true;
   private tasks = new Map<string, { startedAt: number; sample: string }>();
   private samples: string[];
   private durationMs: number;

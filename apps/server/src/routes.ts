@@ -20,6 +20,7 @@ import type { Repo } from "./db/repo.js";
 import type { MeshyClient } from "./meshy/types.js";
 import type { UsageControl } from "./limits.js";
 import { resolveSampleUrl } from "./meshy/mock.js";
+import { resolveLocalUrl } from "./persist.js";
 
 interface Ctx {
   repo: Repo;
@@ -276,11 +277,11 @@ export function registerRoutes(app: FastifyInstance, ctx: Ctx): void {
     url: string,
     contentType: string
   ) {
-    const sample = resolveSampleUrl(url);
-    if (sample) {
-      if (!fs.existsSync(sample)) return reply.code(404).send({ error: "not_found" });
+    const local = resolveSampleUrl(url) ?? resolveLocalUrl(url);
+    if (local) {
+      if (!fs.existsSync(local)) return reply.code(404).send({ error: "not_found" });
       reply.header("Cache-Control", "public, max-age=86400");
-      return reply.type(contentType).send(fs.createReadStream(sample));
+      return reply.type(contentType).send(fs.createReadStream(local));
     }
     const res = await fetch(url);
     if (!res.ok || !res.body) return reply.code(502).send({ error: "upstream_failed" });

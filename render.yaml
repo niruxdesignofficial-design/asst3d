@@ -13,12 +13,15 @@ services:
         value: 0.0.0.0
       - key: NODE_VERSION
         value: 20.19.0
-      # Sin key la app corre en modo MOCK (no gasta créditos).
-      # Cargá tu MESHY_API_KEY en el dashboard de Render (Environment) cuando quieras generación real.
+      # Sin keys la app corre en modo MOCK (no gasta créditos).
+      # Cargá THREEDAI_API_KEY (o MESHY_API_KEY) en el dashboard de Render (Environment)
+      # y poné PROVIDER=3daistudio (o meshy) para generación real.
+      - key: PROVIDER
+        value: mock
+      - key: THREEDAI_API_KEY
+        sync: false
       - key: MESHY_API_KEY
         sync: false
-      - key: MESHY_MOCK
-        value: "true"
       - key: FREE_GENERATIONS_PER_USER
         value: "3"
       - key: GLOBAL_MONTHLY_CAP

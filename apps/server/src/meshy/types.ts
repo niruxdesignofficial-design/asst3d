@@ -31,6 +31,11 @@ export interface ImageTo3DOptions {
  * así el resto del server no sabe (ni le importa) en qué modo corre.
  */
 export interface MeshyClient {
+  /**
+   * true = el proveedor texturiza en dos pasos (Meshy: preview -> refine);
+   * false = un solo job hace todo (3D AI Studio) y el poller no encadena refine.
+   */
+  readonly twoStage: boolean;
   /** text-to-3D paso 1: geometría sin textura */
   createTextPreview(opts: TextTo3DOptions): Promise<string>;
   /** text-to-3D paso 2: texturas sobre el preview */
