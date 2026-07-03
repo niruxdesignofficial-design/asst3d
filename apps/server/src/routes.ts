@@ -22,6 +22,7 @@ import type { UsageControl } from "./limits.js";
 import { resolveSampleUrl } from "./meshy/mock.js";
 import { getStorage, isStoredRef } from "./storage.js";
 import { createSession, issueNonce, verifySession, verifyWalletSignature } from "./auth.js";
+import { findBlockedTerm } from "./moderation.js";
 
 interface Ctx {
   repo: Repo;
@@ -213,6 +214,11 @@ export function registerRoutes(app: FastifyInstance, ctx: Ctx): void {
           error: "invalid_input",
           message: `El prompt debe tener entre 1 y ${MAX_PROMPT_LENGTH - style.promptSuffix.length - 2} caracteres`,
         });
+      if (findBlockedTerm(prompt))
+        return reply.code(400).send({
+          error: "blocked_prompt",
+          message: "That prompt isn't allowed on a public gallery.",
+        });
     } else {
       const uri = body.imageDataUri ?? "";
       const m = uri.match(/^data:([a-z/+.-]+);base64,/i);
@@ -291,9 +297,70 @@ export function registerRoutes(app: FastifyInstance, ctx: Ctx): void {
     return repo.toDtos(await repo.listByUser(deviceId), deviceId);
   });
 
-  // ---- galería pública (Discover) ----
+  // ---- galería pública (Discover): búsqueda + orden + paginación ----
   app.get("/api/discover", async (req) => {
-    return repo.toDtos(await repo.listPublic(), effectiveUserIdOf(req));
+    const { q, sort, page } = req.query as { q?: string; sort?: string; page?: string };
+    const rows = await repo.searchPublic({
+      q,
+      sort: sort === "top" || sort === "recent" ? sort : "trending",
+      page: Number.isFinite(Number(page)) ? Number(page) : 0,
+    });
+    return repo.toDtos(rows, effectiveUserIdOf(req));
+  });
+
+  // ---- reporte de la comunidad (auto-despublica al llegar al umbral) ----
+  app.post("/api/generations/:id/report", async (req, reply) => {
+    const deviceId = deviceIdOf(req);
+    if (!deviceId) return reply.code(400).send({ error: "invalid_input" });
+    if (!usage.codeAttemptOk(`report:${deviceId}`, req.ip))
+      return reply.code(429).send({ error: "rate_limited" });
+    const { id } = req.params as { id: string };
+    if (!(await repo.getGeneration(id))) return reply.code(404).send({ error: "not_found" });
+    const reports = await repo.reportGeneration(id);
+    return { ok: true, reports };
+  });
+
+  // ---- admin (deshabilitado sin ADMIN_TOKEN) ----
+  const isAdmin = (req: FastifyRequest) =>
+    !!config.adminToken && req.headers["x-admin-token"] === config.adminToken;
+
+  app.get("/api/admin/overview", async (req, reply) => {
+    if (!isAdmin(req)) return reply.code(401).send({ error: "auth_required" });
+    const balance = await ctx.meshy.getBalance().catch(() => null);
+    const monthly = await repo.getMonthlyCount();
+    const users = await repo.db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM users`);
+    const recent = await repo.db.all<import("./db/repo.js").GenerationRow>(
+      `SELECT * FROM generations ORDER BY created_at DESC LIMIT 25`
+    );
+    return {
+      providerBalance: balance,
+      monthlyGenerations: monthly,
+      totalUsers: users?.n ?? 0,
+      recent: recent.map((r) => ({
+        id: r.id,
+        prompt: r.prompt,
+        status: r.status,
+        isPublic: r.is_public === 1,
+        reports: r.reports,
+        userId: r.user_id,
+        createdAt: Number(r.created_at),
+      })),
+    };
+  });
+
+  app.post("/api/admin/generations/:id/unpublish", async (req, reply) => {
+    if (!isAdmin(req)) return reply.code(401).send({ error: "auth_required" });
+    const { id } = req.params as { id: string };
+    await repo.db.run(`UPDATE generations SET is_public = 0 WHERE id = ?`, [id]);
+    return { ok: true };
+  });
+
+  app.post("/api/admin/users/:id/ban", async (req, reply) => {
+    if (!isAdmin(req)) return reply.code(401).send({ error: "auth_required" });
+    const { id } = req.params as { id: string };
+    const { banned } = req.body as { banned?: boolean };
+    await repo.setBanned(id, banned !== false);
+    return { ok: true };
   });
 
   // ---- comments ----

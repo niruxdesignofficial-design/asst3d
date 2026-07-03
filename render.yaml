@@ -35,6 +35,9 @@ services:
       # Firma de sesiones (login wallet): Render genera un valor aleatorio
       - key: SESSION_SECRET
         generateValue: true
+      # Panel /admin: Render genera el token; velo en el dashboard para usarlo
+      - key: ADMIN_TOKEN
+        generateValue: true
       - key: R2_ACCOUNT_ID
         sync: false
       - key: R2_ACCESS_KEY_ID

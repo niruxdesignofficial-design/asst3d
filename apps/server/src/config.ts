@@ -82,6 +82,15 @@ export const config = {
   // se genera uno por arranque: las sesiones se invalidan al reiniciar.
   sessionSecret:
     process.env.SESSION_SECRET?.trim() || randomBytes(32).toString("hex"),
+
+  // Panel de administración: sin ADMIN_TOKEN queda deshabilitado.
+  adminToken: process.env.ADMIN_TOKEN?.trim() || "",
+
+  // Moderación de prompts: términos bloqueados extra separados por coma.
+  blockedTerms: (process.env.BLOCKED_TERMS ?? "")
+    .split(",")
+    .map((t) => t.trim().toLowerCase())
+    .filter(Boolean),
 };
 
 function parsePromoCodes(raw: string): Map<string, number> {

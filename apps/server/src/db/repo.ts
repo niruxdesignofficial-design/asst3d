@@ -15,12 +15,14 @@ export interface UserRow {
   bonus_generations: number;
   wallet_address: string | null;
   token_access: number;
+  banned: number;
   display_name: string | null;
 }
 
 export interface GenerationRow {
   id: string;
   user_id: string;
+  reports: number;
   kind: GenerationKind;
   prompt: string | null;
   style_id: string;
@@ -238,6 +240,60 @@ export class Repo {
        ORDER BY created_at DESC LIMIT ?`,
       [limit]
     );
+  }
+
+  /**
+   * Descubrimiento server-side: búsqueda por prompt/autor, orden
+   * trending (likes con decay temporal, aritmética portable) | recent | top,
+   * y paginación. Todo sobre modelos públicos y terminados.
+   */
+  async searchPublic(opts: {
+    q?: string;
+    sort?: "trending" | "recent" | "top";
+    page?: number;
+    pageSize?: number;
+  }): Promise<GenerationRow[]> {
+    const pageSize = Math.min(Math.max(opts.pageSize ?? 24, 1), 60);
+    const offset = Math.max(opts.page ?? 0, 0) * pageSize;
+    const params: unknown[] = [];
+    let where = `g.is_public = 1 AND g.status = 'done'`;
+    if (opts.q?.trim()) {
+      const like = `%${opts.q.trim().toLowerCase()}%`;
+      where += ` AND (LOWER(g.prompt) LIKE ? OR LOWER(COALESCE(u.display_name,'')) LIKE ?)`;
+      params.push(like, like);
+    }
+    // trending: likes / horas-desde-creación (suavizado) — funciona igual en ambos dialectos
+    const order =
+      opts.sort === "top"
+        ? `g.likes DESC, g.created_at DESC`
+        : opts.sort === "recent"
+          ? `g.created_at DESC`
+          : `(g.likes * 1000.0) / (((? - g.created_at) / 3600000.0) + 24.0) DESC, g.created_at DESC`;
+    if (opts.sort !== "top" && opts.sort !== "recent") params.push(Date.now());
+    params.push(pageSize, offset);
+    return this.db.all<GenerationRow>(
+      `SELECT g.* FROM generations g
+       LEFT JOIN users u ON u.id = g.user_id
+       WHERE ${where}
+       ORDER BY ${order}
+       LIMIT ? OFFSET ?`,
+      params
+    );
+  }
+
+  /** Reporte de la comunidad: al llegar al umbral se despublica hasta revisión. */
+  async reportGeneration(id: string, autoUnpublishAt = 5): Promise<number> {
+    await this.db.run(`UPDATE generations SET reports = reports + 1 WHERE id = ?`, [id]);
+    const row = await this.getGeneration(id);
+    const reports = row?.reports ?? 0;
+    if (row && reports >= autoUnpublishAt && row.is_public === 1) {
+      await this.db.run(`UPDATE generations SET is_public = 0 WHERE id = ?`, [id]);
+    }
+    return reports;
+  }
+
+  async setBanned(userId: string, banned: boolean): Promise<void> {
+    await this.db.run(`UPDATE users SET banned = ? WHERE id = ?`, [banned ? 1 : 0, userId]);
   }
 
   listActive(): Promise<GenerationRow[]> {

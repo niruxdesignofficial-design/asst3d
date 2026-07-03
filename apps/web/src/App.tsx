@@ -6,6 +6,8 @@ import { Navbar } from "./components/Navbar";
 import { Home } from "./pages/Home";
 import { Workspace } from "./pages/Workspace";
 import { Author } from "./pages/Author";
+import { ModelPage } from "./pages/ModelPage";
+import { Admin } from "./pages/Admin";
 
 export default function App() {
   const [me, setMe] = useState<MeDto | null>(null);
@@ -23,6 +25,8 @@ export default function App() {
         <Route path="/" element={<Home me={me} refreshMe={refreshMe} />} />
         <Route path="/workspace" element={<Workspace me={me} refreshMe={refreshMe} />} />
         <Route path="/u/:name" element={<Author />} />
+        <Route path="/m/:id" element={<ModelPage />} />
+        <Route path="/admin" element={<Admin />} />
       </Routes>
 
       <footer className="footer">

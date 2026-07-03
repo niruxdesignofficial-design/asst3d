@@ -79,6 +79,8 @@ export class UsageControl {
 
   /** Chequeo completo antes de crear un job. Devuelve el motivo del rechazo o null. */
   async checkGenerate(user: UserRow, ip: string | null): Promise<DenyReason> {
+    // usuarios baneados por el admin: mismo mensaje que rate limit (sin dar pistas)
+    if (user.banned === 1) return "rate_limited";
     if (!this.rateOk(`d:${user.id}`)) return "rate_limited";
     if (ip && !this.rateOk(`ip:${ip}`)) return "rate_limited";
     if (!(await this.capacityOk())) return "capacity_reached";

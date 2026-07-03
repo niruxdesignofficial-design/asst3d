@@ -12,6 +12,7 @@ import {
   likeGeneration,
   listComments,
   postComment,
+  reportGeneration,
   updateGeneration,
 } from "../lib/api";
 import { ModelViewer } from "./ModelViewer";
@@ -93,7 +94,7 @@ export function ModelModal({ gen, onClose, onChanged }: Props) {
 
   const share = () => {
     navigator.clipboard
-      .writeText(`${location.origin}/?model=${gen.id}`)
+      .writeText(`${location.origin}/m/${gen.id}`)
       .then(() => {
         setCopied(true);
         setTimeout(() => setCopied(false), 1600);
@@ -225,6 +226,18 @@ export function ModelModal({ gen, onClose, onChanged }: Props) {
             <button className="btn-secondary" onClick={share}>
               {copied ? "✓ Link copied" : "↗ Share"}
             </button>
+            {!gen.isMine && (
+              <button
+                className="btn-mini report-btn"
+                title="Report this model"
+                onClick={() => {
+                  if (!window.confirm("Report this model as inappropriate?")) return;
+                  reportGeneration(gen.id).catch(() => {});
+                }}
+              >
+                ⚑
+              </button>
+            )}
           </div>
 
           <div className="modal-section comments">

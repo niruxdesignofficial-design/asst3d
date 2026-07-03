@@ -100,13 +100,43 @@ export function Home({ me, refreshMe }: Props) {
   const [gate, setGate] = useState<string | null>(null);
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("Recommended");
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
   const [seedPrompt, setSeedPrompt] = useState("");
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
 
+  // búsqueda con debounce, para no pegarle al server en cada tecla
   useEffect(() => {
-    listDiscover().then(setItems).catch(() => {});
-  }, []);
+    const t = setTimeout(() => setDebouncedQuery(query.trim()), 350);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  const sortOf = (f: (typeof FILTERS)[number]) =>
+    f === "Featured" ? "top" : f === "Recent" || f === "All" ? "recent" : "trending";
+
+  // el server hace la búsqueda, el orden y la paginación
+  useEffect(() => {
+    setPage(0);
+    listDiscover({ q: debouncedQuery || undefined, sort: sortOf(filter) })
+      .then((list) => {
+        setItems(list);
+        setHasMore(list.length >= 24);
+      })
+      .catch(() => {});
+  }, [debouncedQuery, filter]);
+
+  const loadMore = () => {
+    const next = page + 1;
+    listDiscover({ q: debouncedQuery || undefined, sort: sortOf(filter), page: next })
+      .then((list) => {
+        setItems((prev) => [...prev, ...list]);
+        setPage(next);
+        setHasMore(list.length >= 24);
+      })
+      .catch(() => {});
+  };
 
   // Deep link: /?model=<id> opens the detail modal (used by Share).
   useEffect(() => {
@@ -114,30 +144,8 @@ export function Home({ me, refreshMe }: Props) {
     if (id) getGeneration(id).then(setSelected).catch(() => {});
   }, [params]);
 
-  const visible = useMemo(() => {
-    let list = [...items];
-    if (query.trim()) {
-      const q = query.toLowerCase();
-      list = list.filter(
-        (g) =>
-          (g.prompt ?? "").toLowerCase().includes(q) ||
-          g.authorName.toLowerCase().includes(q)
-      );
-    }
-    switch (filter) {
-      case "Featured":
-        return list.sort((a, b) => b.likes - a.likes);
-      case "Recent":
-        return list.sort((a, b) => b.createdAt - a.createdAt);
-      case "Recommended":
-        // likes + recency blend so the top row feels curated
-        return list.sort(
-          (a, b) => b.likes + b.createdAt / 8.64e7 - (a.likes + a.createdAt / 8.64e7)
-        );
-      default:
-        return list;
-    }
-  }, [items, filter, query]);
+  // el server ya devuelve filtrado y ordenado
+  const visible = items;
 
   const closeModal = () => {
     setSelected(null);
@@ -265,6 +273,13 @@ export function Home({ me, refreshMe }: Props) {
             <p className="muted">No public models match that search — be the first to create one!</p>
           )}
         </div>
+        {hasMore && (
+          <div className="load-more">
+            <button className="btn-secondary" onClick={loadMore}>
+              Load more
+            </button>
+          </div>
+        )}
       </section>
 
       <section className="faq">

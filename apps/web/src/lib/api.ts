@@ -68,7 +68,17 @@ export const getGeneration = (id: string) => api<GenerationDto>(`/api/generation
 
 export const listMine = () => api<GenerationDto[]>("/api/generations");
 
-export const listDiscover = () => api<GenerationDto[]>("/api/discover");
+export const listDiscover = (opts: { q?: string; sort?: string; page?: number } = {}) => {
+  const params = new URLSearchParams();
+  if (opts.q) params.set("q", opts.q);
+  if (opts.sort) params.set("sort", opts.sort);
+  if (opts.page) params.set("page", String(opts.page));
+  const qs = params.toString();
+  return api<GenerationDto[]>(`/api/discover${qs ? `?${qs}` : ""}`);
+};
+
+export const reportGeneration = (id: string) =>
+  api<{ ok: true; reports: number }>(`/api/generations/${id}/report`, { method: "POST" });
 
 export const likeGeneration = (id: string) =>
   api<{ likes: number }>(`/api/generations/${id}/like`, { method: "POST" });
