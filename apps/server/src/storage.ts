@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { Readable } from "node:stream";
 import {
+  DeleteObjectCommand,
   GetObjectCommand,
   PutObjectCommand,
   S3Client,
@@ -24,6 +25,8 @@ export interface ModelStorage {
   stream(ref: string): Promise<Readable | null>;
   /** tamaño en bytes si es conocible barato; null si no */
   size(ref: string): Promise<number | null>;
+  /** borra el archivo de la ref (si existe); silencioso si no */
+  delete(ref: string): Promise<void>;
 }
 
 class DiskStorage implements ModelStorage {
@@ -55,6 +58,16 @@ class DiskStorage implements ModelStorage {
       return fs.statSync(file).size;
     } catch {
       return null;
+    }
+  }
+
+  async delete(ref: string): Promise<void> {
+    if (!ref.startsWith("local://")) return;
+    const file = path.join(this.dir(), path.basename(ref.slice("local://".length)));
+    try {
+      fs.unlinkSync(file);
+    } catch {
+      /* ya no existe */
     }
   }
 }
@@ -94,6 +107,12 @@ export class DbStorage implements ModelStorage {
       [ref.slice("db://".length)]
     );
     return row?.n ?? null;
+  }
+
+  async delete(ref: string): Promise<void> {
+    if (ref.startsWith("local://")) return this.fallback.delete(ref);
+    if (!ref.startsWith("db://")) return;
+    await this.db.run(`DELETE FROM blobs WHERE key = ?`, [ref.slice("db://".length)]);
   }
 }
 
@@ -140,6 +159,17 @@ class R2Storage implements ModelStorage {
   async size(ref: string): Promise<number | null> {
     if (!ref.startsWith("r2://")) return this.fallback.size(ref);
     return null; // HeadObject por pedido no vale la pena; el guard del cliente tolera null
+  }
+
+  async delete(ref: string): Promise<void> {
+    if (!ref.startsWith("r2://")) return this.fallback.delete(ref);
+    try {
+      await this.client.send(
+        new DeleteObjectCommand({ Bucket: config.r2Bucket, Key: ref.slice("r2://".length) })
+      );
+    } catch {
+      /* mejor dejar un huérfano que fallar el borrado */
+    }
   }
 }
 

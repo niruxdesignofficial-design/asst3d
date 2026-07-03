@@ -610,6 +610,54 @@ a {
   color: var(--danger);
   font-size: 0.85rem;
 }
+/* wallet + ownership */
+.wallet-chip {
+  border-color: rgba(110, 231, 183, 0.45);
+  color: var(--ok);
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.owner-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.owner-delete:hover:not(:disabled) {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* author profile */
+.author {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 40px 24px 60px;
+}
+.author-head {
+  text-align: center;
+  margin-bottom: 30px;
+}
+.author-avatar {
+  width: 64px;
+  height: 64px;
+  font-size: 1.6rem;
+  margin: 0 auto 10px;
+}
+.author-head h1 {
+  margin: 6px 0 10px;
+}
+.author-stats {
+  display: flex;
+  gap: 22px;
+  justify-content: center;
+  color: var(--text-dim);
+  font-size: 0.92rem;
+}
+.author-stats strong {
+  color: var(--text);
+}
+
 /* promo code redeem */
 .promo-toggle {
   background: none;

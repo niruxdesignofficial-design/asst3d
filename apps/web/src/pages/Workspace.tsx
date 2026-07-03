@@ -191,7 +191,9 @@ export function Workspace({ me, refreshMe }: Props) {
         </div>
       </aside>
 
-      {selected && <ModelModal gen={selected} onClose={() => setSelected(null)} />}
+      {selected && (
+        <ModelModal gen={selected} onClose={() => setSelected(null)} onChanged={refreshMine} />
+      )}
       {gate && (
         <UsageGate
           code={gate}

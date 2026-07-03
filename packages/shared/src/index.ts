@@ -102,6 +102,8 @@ export interface GenerationDto {
   error: string | null;
   isPublic: boolean;
   authorName: string;
+  /** true si el modelo pertenece al usuario del request */
+  isMine: boolean;
   likes: number;
   createdAt: number;
 }
@@ -115,6 +117,10 @@ export interface CommentDto {
 
 export interface MeDto {
   deviceId: string;
+  /** id de cuenta efectivo (address si hay wallet conectada) */
+  userId: string;
+  /** username reservado, o null si todavía no eligió */
+  username: string | null;
   freeLimit: number;
   freeUsed: number;
   freeRemaining: number;

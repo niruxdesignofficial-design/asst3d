@@ -6,17 +6,70 @@ import {
   type CommentDto,
   type GenerationDto,
 } from "@asst3d/shared";
-import { downloadUrl, likeGeneration, listComments, postComment } from "../lib/api";
+import {
+  deleteGeneration,
+  downloadUrl,
+  likeGeneration,
+  listComments,
+  postComment,
+  updateGeneration,
+} from "../lib/api";
 import { ModelViewer } from "./ModelViewer";
 
 interface Props {
   gen: GenerationDto;
   onClose: () => void;
+  /** llamado tras editar/borrar un modelo propio, para refrescar listas */
+  onChanged?: () => void;
 }
 
 /** Model detail: big viewer + info panel with downloads and comments. */
-export function ModelModal({ gen, onClose }: Props) {
+export function ModelModal({ gen, onClose, onChanged }: Props) {
   const [likes, setLikes] = useState(gen.likes);
+  const [title, setTitle] = useState(gen.prompt ?? "Untitled");
+  const [isPublic, setIsPublic] = useState(gen.isPublic);
+  const [editing, setEditing] = useState(false);
+  const [ownerBusy, setOwnerBusy] = useState(false);
+
+  const saveTitle = async () => {
+    const t = title.trim();
+    if (!t || t === gen.prompt) return setEditing(false);
+    setOwnerBusy(true);
+    try {
+      await updateGeneration(gen.id, { title: t });
+      setEditing(false);
+      onChanged?.();
+    } catch {
+      setTitle(gen.prompt ?? "Untitled");
+    } finally {
+      setOwnerBusy(false);
+    }
+  };
+
+  const togglePublic = async () => {
+    setOwnerBusy(true);
+    try {
+      const updated = await updateGeneration(gen.id, { isPublic: !isPublic });
+      setIsPublic(updated.isPublic);
+      onChanged?.();
+    } catch {
+      /* sin cambios */
+    } finally {
+      setOwnerBusy(false);
+    }
+  };
+
+  const removeModel = async () => {
+    if (!window.confirm("Delete this model forever? This cannot be undone.")) return;
+    setOwnerBusy(true);
+    try {
+      await deleteGeneration(gen.id);
+      onChanged?.();
+      onClose();
+    } finally {
+      setOwnerBusy(false);
+    }
+  };
   const [comments, setComments] = useState<CommentDto[]>([]);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
@@ -97,7 +150,38 @@ export function ModelModal({ gen, onClose }: Props) {
             </button>
           </div>
 
-          <h2 className="modal-title">{gen.prompt ?? "Untitled"}</h2>
+          {editing ? (
+            <div className="promo-row">
+              <input
+                className="search promo-input"
+                style={{ textTransform: "none" }}
+                value={title}
+                maxLength={120}
+                autoFocus
+                onChange={(e) => setTitle(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && saveTitle()}
+              />
+              <button className="btn-mini" disabled={ownerBusy} onClick={saveTitle}>
+                Save
+              </button>
+            </div>
+          ) : (
+            <h2 className="modal-title">{title}</h2>
+          )}
+
+          {gen.isMine && (
+            <div className="owner-row">
+              <button className="btn-mini" onClick={() => setEditing(true)} disabled={ownerBusy}>
+                ✎ Rename
+              </button>
+              <button className="btn-mini" onClick={togglePublic} disabled={ownerBusy}>
+                {isPublic ? "🔓 Public" : "🔒 Private"}
+              </button>
+              <button className="btn-mini owner-delete" onClick={removeModel} disabled={ownerBusy}>
+                🗑 Delete
+              </button>
+            </div>
+          )}
 
           <div className="tag-row">
             {style && <span className="tag">{style.label}</span>}

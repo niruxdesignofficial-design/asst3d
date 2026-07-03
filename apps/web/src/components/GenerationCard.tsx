@@ -61,7 +61,15 @@ export function GenerationCard({ gen, onOpen, onLike, compact = false }: Props) 
           {gen.prompt ?? "Untitled"}
         </div>
         <div className="card-meta">
-          <span className="card-author">
+          <span
+            className="card-author"
+            title={gen.authorName !== "guest" ? `View ${gen.authorName}'s profile` : undefined}
+            onClick={(e) => {
+              if (gen.authorName === "guest") return;
+              e.stopPropagation();
+              window.location.href = `/u/${encodeURIComponent(gen.authorName)}`;
+            }}
+          >
             <span className="avatar-dot" aria-hidden>
               {gen.authorName.slice(0, 1).toUpperCase()}
             </span>

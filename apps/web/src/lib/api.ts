@@ -26,12 +26,24 @@ export function getDeviceId(): string {
   return id;
 }
 
+const SESSION_KEY = "asst3d_session";
+
+export function getSession(): string | null {
+  return localStorage.getItem(SESSION_KEY);
+}
+export function setSession(token: string | null): void {
+  if (token) localStorage.setItem(SESSION_KEY, token);
+  else localStorage.removeItem(SESSION_KEY);
+}
+
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
+  const session = getSession();
   const res = await fetch(path, {
     ...init,
     headers: {
       "Content-Type": "application/json",
       "x-device-id": getDeviceId(),
+      ...(session ? { "x-session": session } : {}),
       ...init?.headers,
     },
   });
@@ -69,6 +81,40 @@ export const uploadThumbnail = (id: string, dataUri: string) =>
 
 export const downloadUrl = (id: string, format: string) =>
   `/api/generations/${id}/download?format=${format}`;
+
+// ---- login con wallet ----
+export const authNonce = () =>
+  api<{ nonce: string; message: string }>("/api/auth/nonce", { method: "POST", body: "{}" });
+
+export const authVerify = (address: string, signature: string) =>
+  api<{ ok: true; token: string; expiresAt: number; username: string | null }>(
+    "/api/auth/verify",
+    { method: "POST", body: JSON.stringify({ address, signature }) }
+  );
+
+export const claimUsername = (name: string) =>
+  api<{ ok: true; username: string }>("/api/users/username", {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+
+export const getAuthorProfile = (name: string) =>
+  api<{
+    name: string;
+    joinedAt: number;
+    modelCount: number;
+    totalLikes: number;
+    models: GenerationDto[];
+  }>(`/api/users/${encodeURIComponent(name)}`);
+
+export const updateGeneration = (id: string, patch: { title?: string; isPublic?: boolean }) =>
+  api<GenerationDto>(`/api/generations/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+
+export const deleteGeneration = (id: string) =>
+  api<{ ok: true }>(`/api/generations/${id}`, { method: "DELETE" });
 
 export const redeemCode = (code: string) =>
   api<{ ok: true; bonus: number; freeRemaining: number; freeLimit: number }>(

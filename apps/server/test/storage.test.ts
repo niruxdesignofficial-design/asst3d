@@ -16,6 +16,7 @@ describe("DbStorage (blobs dentro de la DB)", () => {
       put: async () => "local://x",
       stream: async () => null,
       size: async () => null,
+      delete: async () => {},
     });
 
     const data = Buffer.from("glTF-fake-binary-content-1234567890");
@@ -34,6 +35,7 @@ describe("DbStorage (blobs dentro de la DB)", () => {
       put: async () => "x",
       stream: async () => null,
       size: async () => null,
+      delete: async () => {},
     });
 
     await storage.put("k.glb", Buffer.from("v1"), "model/gltf-binary");

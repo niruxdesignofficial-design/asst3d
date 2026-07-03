@@ -32,6 +32,9 @@ services:
       # R2_* = credenciales del bucket de Cloudflare R2
       - key: DATABASE_URL
         sync: false
+      # Firma de sesiones (login wallet): Render genera un valor aleatorio
+      - key: SESSION_SECRET
+        generateValue: true
       - key: R2_ACCOUNT_ID
         sync: false
       - key: R2_ACCESS_KEY_ID

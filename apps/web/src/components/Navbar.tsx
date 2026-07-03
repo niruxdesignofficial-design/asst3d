@@ -2,11 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import { Link, NavLink } from "react-router-dom";
 import type { MeDto } from "@asst3d/shared";
 
+import { WalletButton } from "./WalletButton";
+
 interface Props {
   me: MeDto | null;
+  refreshMe: () => void;
 }
 
-export function Navbar({ me }: Props) {
+export function Navbar({ me, refreshMe }: Props) {
   const [dropOpen, setDropOpen] = useState(false);
   const dropRef = useRef<HTMLDivElement>(null);
 
@@ -67,6 +70,7 @@ export function Navbar({ me }: Props) {
               ⚡ {me.hasTokenAccess ? "∞" : `${me.freeRemaining}/${me.freeLimit}`} free
             </span>
           )}
+          <WalletButton me={me} refreshMe={refreshMe} />
           <a
             className="nav-x"
             href="https://x.com/Formora_3D"

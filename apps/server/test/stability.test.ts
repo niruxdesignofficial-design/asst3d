@@ -18,6 +18,7 @@ function fakeStorage(): ModelStorage & { saved: Map<string, Buffer> } {
     async size() {
       return null;
     },
+    async delete() {},
   };
 }
 

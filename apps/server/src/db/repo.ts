@@ -91,6 +91,55 @@ export class Repo {
     await this.db.run(`UPDATE users SET display_name = ? WHERE id = ?`, [name, userId]);
   }
 
+  getUserByName(name: string): Promise<UserRow | undefined> {
+    return this.db.get<UserRow>(`SELECT * FROM users WHERE display_name = ?`, [name]);
+  }
+
+  /** Intenta reservar un username único. false si ya está tomado. */
+  async claimUsername(userId: string, name: string): Promise<boolean> {
+    const taken = await this.getUserByName(name);
+    if (taken && taken.id !== userId) return false;
+    await this.setDisplayName(userId, name);
+    return true;
+  }
+
+  /**
+   * Migra la identidad guest (device) a la cuenta wallet: el historial y los
+   * contadores del device pasan a la cuenta. Idempotente si no hay nada que migrar.
+   */
+  async mergeDeviceIntoWallet(deviceId: string, walletUserId: string): Promise<void> {
+    if (deviceId === walletUserId) return;
+    const device = await this.getUser(deviceId);
+    if (!device) return;
+    await this.db.transaction(async (tx) => {
+      await tx.run(`UPDATE generations SET user_id = ? WHERE user_id = ?`, [
+        walletUserId,
+        deviceId,
+      ]);
+      await tx.run(`UPDATE comments SET user_id = ? WHERE user_id = ?`, [
+        walletUserId,
+        deviceId,
+      ]);
+      await tx.run(
+        `UPDATE users SET
+           generations_used = generations_used + ?,
+           bonus_generations = bonus_generations + ?
+         WHERE id = ?`,
+        [device.generations_used, device.bonus_generations, walletUserId]
+      );
+      // dejar el device en cero para no duplicar el cupo al volver a mergear
+      await tx.run(
+        `UPDATE users SET generations_used = 0, bonus_generations = 0 WHERE id = ?`,
+        [deviceId]
+      );
+    });
+  }
+
+  async deleteGeneration(id: string): Promise<void> {
+    await this.db.run(`DELETE FROM comments WHERE generation_id = ?`, [id]);
+    await this.db.run(`DELETE FROM generations WHERE id = ?`, [id]);
+  }
+
   /**
    * Canjea un código promo: atómico, una sola vez por usuario+código.
    * Devuelve false si ese usuario ya lo había canjeado.
@@ -244,7 +293,7 @@ export class Repo {
   }
 
   // ---- mapping a DTO público ----
-  async toDto(row: GenerationRow, authorName = "guest"): Promise<GenerationDto> {
+  async toDto(row: GenerationRow, requesterId?: string | null): Promise<GenerationDto> {
     const urls = row.model_urls ? (JSON.parse(row.model_urls) as Record<string, string>) : {};
     const formats = Object.keys(urls).filter((f) =>
       ["glb", "fbx", "obj", "usdz"].includes(f)
@@ -267,13 +316,14 @@ export class Repo {
       viewerUrl: urls.glb ? `/api/generations/${row.id}/model.glb` : null,
       error: row.error,
       isPublic: row.is_public === 1,
-      authorName: user?.display_name ?? authorName,
+      authorName: user?.display_name ?? "guest",
+      isMine: !!requesterId && row.user_id === requesterId,
       likes: row.likes,
       createdAt: Number(row.created_at),
     };
   }
 
-  async toDtos(rows: GenerationRow[]): Promise<GenerationDto[]> {
-    return Promise.all(rows.map((r) => this.toDto(r)));
+  async toDtos(rows: GenerationRow[], requesterId?: string | null): Promise<GenerationDto[]> {
+    return Promise.all(rows.map((r) => this.toDto(r, requesterId)));
   }
 }

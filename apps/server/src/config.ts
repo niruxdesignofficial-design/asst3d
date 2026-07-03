@@ -1,5 +1,6 @@
 import path from "node:path";
 import fs from "node:fs";
+import { randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -76,6 +77,11 @@ export const config = {
 
   // Códigos promo: "CODE:gens,OTRO:5" — canjeables una vez por usuario.
   promoCodes: parsePromoCodes(process.env.PROMO_CODES ?? "FREE3:3"),
+
+  // Firma de los tokens de sesión (login con wallet). Sin SESSION_SECRET fijo,
+  // se genera uno por arranque: las sesiones se invalidan al reiniciar.
+  sessionSecret:
+    process.env.SESSION_SECRET?.trim() || randomBytes(32).toString("hex"),
 };
 
 function parsePromoCodes(raw: string): Map<string, number> {
