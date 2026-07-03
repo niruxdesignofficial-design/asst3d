@@ -44,15 +44,15 @@ describe("JobPoller", () => {
   let meshy: ScriptedMeshy;
   let poller: JobPoller;
 
-  beforeEach(() => {
-    repo = new Repo(openDb(":memory:"));
+  beforeEach(async () => {
+    repo = new Repo(await openDb(":memory:"));
     meshy = new ScriptedMeshy();
     poller = new JobPoller(repo, meshy);
-    repo.upsertUser("u1", null);
+    await repo.upsertUser("u1", null);
   });
 
-  function newTextGen() {
-    const row = repo.createGeneration({
+  async function newTextGen() {
+    return repo.createGeneration({
       userId: "u1",
       kind: "text",
       prompt: "un robot",
@@ -60,25 +60,24 @@ describe("JobPoller", () => {
       modelType: "lowpoly",
       isPublic: true,
     });
-    return row;
   }
 
   it("avanza progreso durante preview (0-50%)", async () => {
-    const row = newTextGen();
-    repo.updateGeneration(row.id, { meshy_task_id: "p1", status: "processing" });
+    const row = await newTextGen();
+    await repo.updateGeneration(row.id, { meshy_task_id: "p1", status: "processing" });
     meshy.set("p1", { status: "IN_PROGRESS", progress: 60 });
     await poller.tick();
-    const g = repo.getGeneration(row.id)!;
+    const g = (await repo.getGeneration(row.id))!;
     expect(g.status).toBe("processing");
     expect(g.progress).toBe(30); // 60% de preview = 30% total
   });
 
   it("al terminar preview encadena refine automáticamente", async () => {
-    const row = newTextGen();
-    repo.updateGeneration(row.id, { meshy_task_id: "p1", status: "processing" });
+    const row = await newTextGen();
+    await repo.updateGeneration(row.id, { meshy_task_id: "p1", status: "processing" });
     meshy.set("p1", { status: "SUCCEEDED", progress: 100 });
     await poller.tick();
-    const g = repo.getGeneration(row.id)!;
+    const g = (await repo.getGeneration(row.id))!;
     expect(meshy.refineCreated).toEqual(["p1"]);
     expect(g.stage).toBe("refine");
     expect(g.status).toBe("processing");
@@ -86,8 +85,8 @@ describe("JobPoller", () => {
   });
 
   it("al terminar refine guarda las model_urls y marca done", async () => {
-    const row = newTextGen();
-    repo.updateGeneration(row.id, {
+    const row = await newTextGen();
+    await repo.updateGeneration(row.id, {
       meshy_task_id: "r1",
       stage: "refine",
       status: "processing",
@@ -99,31 +98,31 @@ describe("JobPoller", () => {
       thumbnail_url: "https://x/t.png",
     });
     await poller.tick();
-    const g = repo.getGeneration(row.id)!;
+    const g = (await repo.getGeneration(row.id))!;
     expect(g.status).toBe("done");
     expect(g.progress).toBe(100);
     expect(JSON.parse(g.model_urls!)).toEqual({
       glb: "https://x/m.glb",
       fbx: "https://x/m.fbx",
     });
-    const dto = repo.toDto(g);
+    const dto = await repo.toDto(g);
     expect(dto.formats).toEqual(["glb", "fbx"]);
     expect(dto.viewerUrl).toBe(`/api/generations/${g.id}/model.glb`);
   });
 
   it("una task de imagen no encadena refine: done directo", async () => {
-    const row = repo.createGeneration({
+    const row = await repo.createGeneration({
       userId: "u1",
       kind: "image",
       prompt: null,
-      styleId: "realista",
+      styleId: "realistic",
       modelType: "standard",
       isPublic: true,
     });
-    repo.updateGeneration(row.id, { meshy_task_id: "i1", status: "processing" });
+    await repo.updateGeneration(row.id, { meshy_task_id: "i1", status: "processing" });
     meshy.set("i1", { status: "SUCCEEDED", progress: 100, model_urls: { glb: "https://x/i.glb" } });
     await poller.tick();
-    const g = repo.getGeneration(row.id)!;
+    const g = (await repo.getGeneration(row.id))!;
     expect(g.status).toBe("done");
     expect(meshy.refineCreated).toHaveLength(0);
   });
@@ -133,21 +132,21 @@ describe("JobPoller", () => {
     const pollerWithFast = new JobPoller(repo, meshy, 3000, undefined, { fast: fastMeshy });
 
     // fila fast -> debe consultar al cliente fast
-    const fastRow = repo.createGeneration({
+    const fastRow = await repo.createGeneration({
       userId: "u1", kind: "text", prompt: "fast robot", styleId: "lowpoly",
       modelType: "lowpoly", isPublic: true, provider: "fast",
     });
-    repo.updateGeneration(fastRow.id, { meshy_task_id: "f1", status: "processing" });
+    await repo.updateGeneration(fastRow.id, { meshy_task_id: "f1", status: "processing" });
     fastMeshy.set("f1", { status: "IN_PROGRESS", progress: 80 });
 
     // fila normal -> cliente default
-    const normalRow = newTextGen();
-    repo.updateGeneration(normalRow.id, { meshy_task_id: "n1", status: "processing" });
+    const normalRow = await newTextGen();
+    await repo.updateGeneration(normalRow.id, { meshy_task_id: "n1", status: "processing" });
     meshy.set("n1", { status: "IN_PROGRESS", progress: 20 });
 
     await pollerWithFast.tick();
-    expect(repo.getGeneration(fastRow.id)!.progress).toBe(40); // 80% de preview
-    expect(repo.getGeneration(normalRow.id)!.progress).toBe(10);
+    expect((await repo.getGeneration(fastRow.id))!.progress).toBe(40); // 80% de preview
+    expect((await repo.getGeneration(normalRow.id))!.progress).toBe(10);
 
     // al terminar el preview fast, el refine se encadena en el cliente FAST
     fastMeshy.set("f1", { status: "SUCCEEDED", progress: 100 });
@@ -158,52 +157,65 @@ describe("JobPoller", () => {
 
   it("proveedor de un paso (twoStage=false): texto termina sin encadenar refine", async () => {
     meshy.twoStage = false; // como 3D AI Studio
-    const row = newTextGen();
-    repo.updateGeneration(row.id, { meshy_task_id: "p1", status: "processing" });
+    const row = await newTextGen();
+    await repo.updateGeneration(row.id, { meshy_task_id: "p1", status: "processing" });
     meshy.set("p1", { status: "SUCCEEDED", progress: 100, model_urls: { glb: "https://x/one.glb" } });
     await poller.tick();
-    const g = repo.getGeneration(row.id)!;
+    const g = (await repo.getGeneration(row.id))!;
     expect(g.status).toBe("done");
     expect(meshy.refineCreated).toHaveLength(0);
     expect(JSON.parse(g.model_urls!).glb).toBe("https://x/one.glb");
   });
 
-  it("marca failed con el mensaje de error de Meshy", async () => {
-    const row = newTextGen();
-    repo.updateGeneration(row.id, { meshy_task_id: "p1", status: "processing" });
+  it("marca failed con el mensaje de error de Meshy y reembolsa el cupo", async () => {
+    await repo.incrementUsage("u1", null, "gen-previa");
+    const row = await newTextGen();
+    await repo.updateGeneration(row.id, { meshy_task_id: "p1", status: "processing" });
     meshy.set("p1", { status: "FAILED", progress: 10, task_error: { message: "nsfw prompt" } });
     await poller.tick();
-    const g = repo.getGeneration(row.id)!;
+    const g = (await repo.getGeneration(row.id))!;
     expect(g.status).toBe("failed");
     expect(g.error).toBe("nsfw prompt");
+    // el fallo devolvió el uso
+    expect((await repo.getUser("u1"))!.generations_used).toBe(0);
   });
 
   it("tolera errores de red transitorios y recién falla tras varios seguidos", async () => {
-    const row = newTextGen();
-    repo.updateGeneration(row.id, { meshy_task_id: "desconocida", status: "processing" });
+    const row = await newTextGen();
+    await repo.updateGeneration(row.id, { meshy_task_id: "desconocida", status: "processing" });
     // Los primeros ticks con error NO matan el job (transitorios)...
     for (let i = 0; i < 4; i++) {
       await poller.tick();
-      expect(repo.getGeneration(row.id)!.status).toBe("processing");
+      expect((await repo.getGeneration(row.id))!.status).toBe("processing");
     }
     // ...el quinto error consecutivo sí.
     await poller.tick();
-    const g = repo.getGeneration(row.id)!;
+    const g = (await repo.getGeneration(row.id))!;
     expect(g.status).toBe("failed");
     expect(g.error).toContain("unknown task");
   });
 
   it("un error transitorio no acumula si después se recupera", async () => {
-    const row = newTextGen();
-    repo.updateGeneration(row.id, { meshy_task_id: "flaky", status: "processing" });
+    const row = await newTextGen();
+    await repo.updateGeneration(row.id, { meshy_task_id: "flaky", status: "processing" });
     await poller.tick(); // error 1 (task desconocida)
-    expect(repo.getGeneration(row.id)!.status).toBe("processing");
+    expect((await repo.getGeneration(row.id))!.status).toBe("processing");
     meshy.set("flaky", { status: "IN_PROGRESS", progress: 40 }); // se recupera
     await poller.tick();
-    expect(repo.getGeneration(row.id)!.progress).toBeGreaterThan(0);
+    expect((await repo.getGeneration(row.id))!.progress).toBeGreaterThan(0);
     // el contador se reseteó: harían falta 5 errores nuevos para fallar
     meshy.tasks.delete("flaky");
     for (let i = 0; i < 4; i++) await poller.tick();
-    expect(repo.getGeneration(row.id)!.status).toBe("processing");
+    expect((await repo.getGeneration(row.id))!.status).toBe("processing");
+  });
+
+  it("los 429 del proveedor no cuentan como errores del job", async () => {
+    const row = await newTextGen();
+    await repo.updateGeneration(row.id, { meshy_task_id: "th1", status: "processing" });
+    meshy.getTask = async () => {
+      throw new Error("3daistudio -> 429: RATE_LIMITED");
+    };
+    for (let i = 0; i < 10; i++) await poller.tick();
+    expect((await repo.getGeneration(row.id))!.status).toBe("processing");
   });
 });

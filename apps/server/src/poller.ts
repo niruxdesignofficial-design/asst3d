@@ -2,11 +2,11 @@ import type { Repo, GenerationRow } from "./db/repo.js";
 import type { MeshyClient } from "./meshy/types.js";
 
 /**
- * Un solo loop en el server consulta las tasks activas a Meshy y actualiza la DB.
- * Los clientes hacen polling contra NUESTRA DB, nunca contra Meshy.
+ * Un solo loop en el server consulta las tasks activas al proveedor y actualiza
+ * la DB. Los clientes hacen polling contra NUESTRA DB, nunca contra el proveedor.
  *
- * text-to-3D es en dos etapas: preview (geometría) -> refine (texturas).
- * El poller encadena la segunda etapa automáticamente.
+ * Los proveedores twoStage (Meshy: preview->refine; Fast: imagen->TRELLIS)
+ * encadenan la segunda etapa automáticamente.
  */
 const MAX_CONSECUTIVE_ERRORS = 5;
 
@@ -21,13 +21,14 @@ export class JobPoller {
     private meshy: MeshyClient,
     private intervalMs = 3000,
     /**
-     * Hook opcional para persistir los modelos al completar (las URLs de los
-     * proveedores expiran). Recibe las URLs upstream y devuelve las definitivas.
+     * Hook opcional para persistir modelo+thumbnail al completar (las URLs de
+     * los proveedores expiran). Devuelve las refs definitivas.
      */
     private persist?: (
       generationId: string,
-      urls: Record<string, string>
-    ) => Promise<Record<string, string>>,
+      urls: Record<string, string>,
+      thumbnailUrl?: string | null
+    ) => Promise<{ urls: Record<string, string>; thumbnailUrl: string | null }>,
     /** Clientes extra por proveedor (ej. "fast"); si no matchea, usa el default. */
     private clients?: Record<string, MeshyClient>
   ) {}
@@ -47,10 +48,10 @@ export class JobPoller {
   }
 
   async tick(): Promise<void> {
-    if (this.busy) return; // no solapar ticks si Meshy tarda
+    if (this.busy) return; // no solapar ticks si el proveedor tarda
     this.busy = true;
     try {
-      for (const row of this.repo.listActive()) {
+      for (const row of await this.repo.listActive()) {
         try {
           await this.advance(row);
           this.errCounts.delete(row.id);
@@ -62,12 +63,12 @@ export class JobPoller {
           this.errCounts.set(row.id, errors);
           if (errors >= MAX_CONSECUTIVE_ERRORS) {
             this.errCounts.delete(row.id);
-            this.repo.updateGeneration(row.id, {
+            await this.repo.updateGeneration(row.id, {
               status: "failed",
               error: msg.slice(0, 500),
             });
             // Que el fallo no le queme el cupo gratis al usuario.
-            this.repo.refundUsage(row.user_id);
+            await this.repo.refundUsage(row.user_id);
           }
           // Menos que el tope: lo reintentamos en el próximo tick.
         }
@@ -84,7 +85,7 @@ export class JobPoller {
 
     switch (task.status) {
       case "PENDING":
-        this.repo.updateGeneration(row.id, { status: "processing", progress: 0 });
+        await this.repo.updateGeneration(row.id, { status: "processing", progress: 0 });
         break;
       case "IN_PROGRESS": {
         // Para text: preview = 0-50%, refine = 50-100%, así la barra no "retrocede".
@@ -94,14 +95,14 @@ export class JobPoller {
               ? Math.round(task.progress / 2)
               : 50 + Math.round(task.progress / 2)
             : task.progress;
-        this.repo.updateGeneration(row.id, { status: "processing", progress });
+        await this.repo.updateGeneration(row.id, { status: "processing", progress });
         break;
       }
       case "SUCCEEDED": {
         if (client.twoStage && row.kind === "text" && row.stage === "preview") {
           // Encadenar refine para conseguir texturas.
           const refineId = await client.createTextRefine(row.meshy_task_id);
-          this.repo.updateGeneration(row.id, {
+          await this.repo.updateGeneration(row.id, {
             stage: "refine",
             meshy_task_id: refineId,
             progress: 50,
@@ -109,23 +110,28 @@ export class JobPoller {
           return;
         }
         let urls = (task.model_urls ?? {}) as Record<string, string>;
-        if (this.persist) urls = await this.persist(row.id, urls);
-        this.repo.updateGeneration(row.id, {
+        let thumbnailUrl: string | null = task.thumbnail_url ?? null;
+        if (this.persist) {
+          const persisted = await this.persist(row.id, urls, thumbnailUrl);
+          urls = persisted.urls;
+          thumbnailUrl = persisted.thumbnailUrl;
+        }
+        await this.repo.updateGeneration(row.id, {
           status: "done",
           progress: 100,
           model_urls: JSON.stringify(urls),
-          thumbnail_url: task.thumbnail_url ?? null,
+          thumbnail_url: thumbnailUrl,
         });
         break;
       }
       case "FAILED":
       case "CANCELED":
-        this.repo.updateGeneration(row.id, {
+        await this.repo.updateGeneration(row.id, {
           status: "failed",
           error: task.task_error?.message ?? "generation failed",
         });
         // Que el fallo no le queme el cupo gratis al usuario.
-        this.repo.refundUsage(row.user_id);
+        await this.repo.refundUsage(row.user_id);
         break;
     }
   }

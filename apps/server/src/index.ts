@@ -19,7 +19,7 @@ const app = Fastify({
   bodyLimit: 30 * 1024 * 1024, // margen para imágenes base64 de hasta 20MB
 });
 
-const db = openDb();
+const db = await openDb();
 const repo = new Repo(db);
 const meshy =
   config.provider === "3daistudio"
@@ -39,7 +39,7 @@ const poller = new JobPoller(
   fast ? { fast } : undefined
 );
 
-seedDiscover(repo);
+await seedDiscover(repo);
 registerRoutes(app, { repo, meshy, usage, fast });
 poller.start();
 

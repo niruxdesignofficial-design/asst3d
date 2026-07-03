@@ -86,8 +86,8 @@ const SEED_COMMENTS = [
   "using this in my game jam entry, thanks!",
 ];
 
-export function seedDiscover(repo: Repo): void {
-  if (repo.listPublic(1).length > 0) return;
+export async function seedDiscover(repo: Repo): Promise<void> {
+  if ((await repo.listPublic(1)).length > 0) return;
   if (!fs.existsSync(config.samplesDir)) return;
   const samples = fs.readdirSync(config.samplesDir).filter((f) => f.endsWith(".glb"));
   if (samples.length === 0) return;
@@ -97,8 +97,8 @@ export function seedDiscover(repo: Repo): void {
   for (const info of Object.values(SEEDS)) {
     if (!authors.has(info.author)) {
       const id = `seed-${info.author}`;
-      repo.upsertUser(id, null);
-      repo.setDisplayName(id, info.author);
+      await repo.upsertUser(id, null);
+      await repo.setDisplayName(id, info.author);
       authors.set(info.author, id);
     }
   }
@@ -107,7 +107,7 @@ export function seedDiscover(repo: Repo): void {
   let i = 0;
   for (const file of samples) {
     const info = SEEDS[file];
-    const row = repo.createGeneration({
+    const row = await repo.createGeneration({
       userId: info ? authors.get(info.author)! : fallbackAuthor,
       kind: info?.kind ?? "text",
       prompt: info?.title ?? file.replace(".glb", ""),
@@ -116,7 +116,7 @@ export function seedDiscover(repo: Repo): void {
       isPublic: true,
     });
     const url = `sample://${file}`;
-    repo.updateGeneration(row.id, {
+    await repo.updateGeneration(row.id, {
       status: "done",
       progress: 100,
       meshy_task_id: `seed-${randomUUID()}`,
@@ -125,7 +125,7 @@ export function seedDiscover(repo: Repo): void {
     });
     // A couple of seeded comments spread across models
     if (i < SEED_COMMENTS.length) {
-      repo.addComment(row.id, fallbackAuthor, SEED_COMMENTS[i]);
+      await repo.addComment(row.id, fallbackAuthor, SEED_COMMENTS[i]);
     }
     i++;
   }

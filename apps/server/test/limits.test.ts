@@ -47,55 +47,55 @@ describe("UsageControl (server-authoritative)", () => {
   let repo: Repo;
   let meshy: FakeMeshy;
 
-  beforeEach(() => {
-    repo = new Repo(openDb(":memory:"));
+  beforeEach(async () => {
+    repo = new Repo(await openDb(":memory:"));
     meshy = new FakeMeshy();
   });
 
   it("permite generar a un usuario nuevo y descuenta el límite gratis", async () => {
     const usage = new UsageControl(repo, meshy, cfg({ rateLimitPerMinute: 100, rateLimitPerHour: 100 }));
-    const user = repo.upsertUser("device-1", "1.1.1.1");
+    const user = await repo.upsertUser("device-1", "1.1.1.1");
     expect(await usage.checkGenerate(user, "1.1.1.1")).toBeNull();
     expect(usage.freeRemaining(user)).toBe(3);
-    usage.consume(user, "1.1.1.1", "gen-1");
-    expect(usage.freeRemaining(repo.getUser("device-1")!)).toBe(2);
+    await usage.consume(user, "1.1.1.1", "gen-1");
+    expect(usage.freeRemaining((await repo.getUser("device-1"))!)).toBe(2);
   });
 
   it("bloquea con free_limit_reached al agotar lo gratis", async () => {
     const usage = new UsageControl(repo, meshy, cfg({ rateLimitPerMinute: 100, rateLimitPerHour: 100 }));
-    let user = repo.upsertUser("device-1", "1.1.1.1");
+    await repo.upsertUser("device-1", "1.1.1.1");
     for (let i = 0; i < 3; i++) {
-      expect(await usage.checkGenerate(repo.getUser("device-1")!, "1.1.1.1")).toBeNull();
-      usage.consume(repo.getUser("device-1")!, "1.1.1.1", `gen-${i}`);
+      expect(await usage.checkGenerate((await repo.getUser("device-1"))!, "1.1.1.1")).toBeNull();
+      await usage.consume((await repo.getUser("device-1"))!, "1.1.1.1", `gen-${i}`);
     }
-    user = repo.getUser("device-1")!;
+    const user = (await repo.getUser("device-1"))!;
     expect(usage.freeRemaining(user)).toBe(0);
     expect(await usage.checkGenerate(user, "1.1.1.1")).toBe("free_limit_reached");
   });
 
   it("usuario con acceso por token no tiene límite gratis", async () => {
     const usage = new UsageControl(repo, meshy, cfg({ rateLimitPerMinute: 100, rateLimitPerHour: 100 }));
-    repo.upsertUser("device-1", null);
+    await repo.upsertUser("device-1", null);
     // simular acceso pago
-    (repo as unknown as { db: import("better-sqlite3").Database }).db
-      .prepare(`UPDATE users SET token_access = 1, generations_used = 99 WHERE id = 'device-1'`)
-      .run();
-    const user = repo.getUser("device-1")!;
+    await repo.db.run(
+      `UPDATE users SET token_access = 1, generations_used = 99 WHERE id = 'device-1'`
+    );
+    const user = (await repo.getUser("device-1"))!;
     expect(await usage.checkGenerate(user, "1.1.1.1")).toBeNull();
   });
 
   it("bloquea con capacity_reached al llegar al tope global mensual", async () => {
     const usage = new UsageControl(repo, meshy, cfg({ globalMonthlyCap: 2, rateLimitPerMinute: 100, rateLimitPerHour: 100 }));
-    repo.incrementMonthly();
-    repo.incrementMonthly();
-    const user = repo.upsertUser("device-1", "1.1.1.1");
+    await repo.incrementMonthly();
+    await repo.incrementMonthly();
+    const user = await repo.upsertUser("device-1", "1.1.1.1");
     expect(await usage.checkGenerate(user, "1.1.1.1")).toBe("capacity_reached");
   });
 
   it("frena si el balance real de Meshy está por debajo del mínimo (modo no-mock)", async () => {
     meshy.balance = 5;
     const usage = new UsageControl(repo, meshy, cfg({ meshyMock: false, rateLimitPerMinute: 100, rateLimitPerHour: 100 }));
-    const user = repo.upsertUser("device-1", "1.1.1.1");
+    const user = await repo.upsertUser("device-1", "1.1.1.1");
     expect(await usage.checkGenerate(user, "1.1.1.1")).toBe("capacity_reached");
   });
 
@@ -104,13 +104,13 @@ describe("UsageControl (server-authoritative)", () => {
       throw new Error("network down");
     };
     const usage = new UsageControl(repo, meshy, cfg({ meshyMock: false, rateLimitPerMinute: 100, rateLimitPerHour: 100 }));
-    const user = repo.upsertUser("device-1", "1.1.1.1");
+    const user = await repo.upsertUser("device-1", "1.1.1.1");
     expect(await usage.checkGenerate(user, "1.1.1.1")).toBe("capacity_reached");
   });
 
   it("aplica rate-limit por device dentro de la ventana", async () => {
     const usage = new UsageControl(repo, meshy, cfg({ rateLimitPerMinute: 2, rateLimitPerHour: 100 }));
-    const user = repo.upsertUser("device-1", "1.1.1.1");
+    const user = await repo.upsertUser("device-1", "1.1.1.1");
     expect(await usage.checkGenerate(user, null)).toBeNull();
     expect(await usage.checkGenerate(user, null)).toBeNull();
     expect(await usage.checkGenerate(user, null)).toBe("rate_limited");
@@ -118,29 +118,39 @@ describe("UsageControl (server-authoritative)", () => {
 
   it("un código promo suma generaciones y solo se canjea una vez", async () => {
     const usage = new UsageControl(repo, meshy, cfg({ rateLimitPerMinute: 100, rateLimitPerHour: 100 }));
-    let user = repo.upsertUser("device-1", "1.1.1.1");
+    let user = await repo.upsertUser("device-1", "1.1.1.1");
     // agotar las 3 gratis base
-    for (let i = 0; i < 3; i++) usage.consume(repo.getUser("device-1")!, "1.1.1.1", `g${i}`);
-    user = repo.getUser("device-1")!;
+    for (let i = 0; i < 3; i++)
+      await usage.consume((await repo.getUser("device-1"))!, "1.1.1.1", `g${i}`);
+    user = (await repo.getUser("device-1"))!;
     expect(await usage.checkGenerate(user, "1.1.1.1")).toBe("free_limit_reached");
 
     // canje FREE3 => +3
-    expect(repo.redeemCode(user.id, "FREE3", 3)).toBe(true);
-    user = repo.getUser("device-1")!;
+    expect(await repo.redeemCode(user.id, "FREE3", 3)).toBe(true);
+    user = (await repo.getUser("device-1"))!;
     expect(usage.freeAllowance(user)).toBe(6);
     expect(usage.freeRemaining(user)).toBe(3);
     expect(await usage.checkGenerate(user, "1.1.1.1")).toBeNull();
 
     // segundo canje del mismo código: rechazado, sin duplicar bonus
-    expect(repo.redeemCode(user.id, "FREE3", 3)).toBe(false);
-    expect(usage.freeAllowance(repo.getUser("device-1")!)).toBe(6);
+    expect(await repo.redeemCode(user.id, "FREE3", 3)).toBe(false);
+    expect(usage.freeAllowance((await repo.getUser("device-1"))!)).toBe(6);
+  });
+
+  it("el refund devuelve un uso sin ir por debajo de cero", async () => {
+    await repo.upsertUser("device-1", null);
+    await repo.refundUsage("device-1"); // en cero: queda en cero
+    expect((await repo.getUser("device-1"))!.generations_used).toBe(0);
+    await repo.incrementUsage("device-1", null, "g1");
+    await repo.refundUsage("device-1");
+    expect((await repo.getUser("device-1"))!.generations_used).toBe(0);
   });
 
   it("aplica rate-limit por IP aunque cambie el device", async () => {
     const usage = new UsageControl(repo, meshy, cfg({ rateLimitPerMinute: 2, rateLimitPerHour: 100 }));
     const ip = "9.9.9.9";
-    expect(await usage.checkGenerate(repo.upsertUser("d1", ip), ip)).toBeNull();
-    expect(await usage.checkGenerate(repo.upsertUser("d2", ip), ip)).toBeNull();
-    expect(await usage.checkGenerate(repo.upsertUser("d3", ip), ip)).toBe("rate_limited");
+    expect(await usage.checkGenerate(await repo.upsertUser("d1", ip), ip)).toBeNull();
+    expect(await usage.checkGenerate(await repo.upsertUser("d2", ip), ip)).toBeNull();
+    expect(await usage.checkGenerate(await repo.upsertUser("d3", ip), ip)).toBe("rate_limited");
   });
 });

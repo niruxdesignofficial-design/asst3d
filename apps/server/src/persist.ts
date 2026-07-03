@@ -1,48 +1,38 @@
-import fs from "node:fs";
-import path from "node:path";
-import { pipeline } from "node:stream/promises";
-import { Readable } from "node:stream";
-import { config } from "./config.js";
+import { storage, isStoredRef } from "./storage.js";
 
 /**
- * Las URLs de resultados de los proveedores EXPIRAN (3D AI Studio: 24h; Meshy
+ * Las URLs de resultados de los proveedores EXPIRAN (3D AI Studio: 1-24h; Meshy
  * también rota las suyas). Para que la galería y las descargas sigan vivas,
- * bajamos el GLB a disco al completar el job y lo referenciamos como local://.
- * Los demás formatos quedan con su URL upstream (sirven para descarga inmediata).
+ * bajamos el GLB (y el thumbnail si hay) al storage al completar el job.
+ * Con R2 configurado los archivos sobreviven deploys; si no, disco local.
  */
 
-export function modelsDir(): string {
-  const dir = path.join(config.dataDir, "models");
-  fs.mkdirSync(dir, { recursive: true });
-  return dir;
-}
-
-/** Resuelve una URL local://<archivo> a su ruta en disco, o null si no es local. */
-export function resolveLocalUrl(url: string): string | null {
-  if (!url.startsWith("local://")) return null;
-  const file = path.basename(url.slice("local://".length));
-  return path.join(modelsDir(), file);
+async function download(url: string): Promise<Buffer> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`persist: upstream ${res.status}`);
+  return Buffer.from(await res.arrayBuffer());
 }
 
 export async function persistModels(
   generationId: string,
-  urls: Record<string, string>
-): Promise<Record<string, string>> {
+  urls: Record<string, string>,
+  thumbnailUrl?: string | null
+): Promise<{ urls: Record<string, string>; thumbnailUrl: string | null }> {
   const out = { ...urls };
-  const glb = urls.glb;
-  // sample:// (mock) ya es local y estable; no hay nada que persistir.
-  if (!glb || glb.startsWith("sample://") || glb.startsWith("local://")) return out;
 
-  const file = `${generationId}.glb`;
-  const dest = path.join(modelsDir(), file);
-  const tmp = `${dest}.tmp`;
-  const res = await fetch(glb);
-  if (!res.ok || !res.body) throw new Error(`persist: upstream ${res.status}`);
-  await pipeline(
-    Readable.fromWeb(res.body as import("node:stream/web").ReadableStream),
-    fs.createWriteStream(tmp)
-  );
-  fs.renameSync(tmp, dest);
-  out.glb = `local://${file}`;
-  return out;
+  const glb = urls.glb;
+  if (glb && !glb.startsWith("sample://") && !isStoredRef(glb)) {
+    out.glb = await storage.put(`${generationId}.glb`, await download(glb), "model/gltf-binary");
+  }
+
+  let thumb: string | null = thumbnailUrl ?? null;
+  if (thumb && !isStoredRef(thumb)) {
+    try {
+      thumb = await storage.put(`${generationId}.thumb.png`, await download(thumb), "image/png");
+    } catch {
+      thumb = null; // el thumbnail es opcional: el cliente puede renderizarlo del GLB
+    }
+  }
+
+  return { urls: out, thumbnailUrl: thumb };
 }

@@ -20,7 +20,7 @@ import type { Repo } from "./db/repo.js";
 import type { MeshyClient } from "./meshy/types.js";
 import type { UsageControl } from "./limits.js";
 import { resolveSampleUrl } from "./meshy/mock.js";
-import { resolveLocalUrl } from "./persist.js";
+import { storage, isStoredRef } from "./storage.js";
 
 interface Ctx {
   repo: Repo;
@@ -47,7 +47,7 @@ export function registerRoutes(app: FastifyInstance, ctx: Ctx): void {
   app.get("/api/me", async (req, reply) => {
     const deviceId = deviceIdOf(req);
     if (!deviceId) return reply.code(400).send({ error: "invalid_input" });
-    const user = repo.upsertUser(deviceId, req.ip);
+    const user = await repo.upsertUser(deviceId, req.ip);
     const me: MeDto = {
       deviceId,
       freeLimit: usage.freeAllowance(user),
@@ -75,11 +75,11 @@ export function registerRoutes(app: FastifyInstance, ctx: Ctx): void {
     const bonus = config.promoCodes.get(normalized);
     if (!bonus) return reply.code(404).send({ error: "invalid_code" });
 
-    const user = repo.upsertUser(deviceId, req.ip);
-    if (!repo.redeemCode(user.id, normalized, bonus))
+    const user = await repo.upsertUser(deviceId, req.ip);
+    if (!(await repo.redeemCode(user.id, normalized, bonus)))
       return reply.code(409).send({ error: "already_redeemed" });
 
-    const updated = repo.getUser(user.id)!;
+    const updated = (await repo.getUser(user.id))!;
     return {
       ok: true,
       bonus,
@@ -137,7 +137,7 @@ export function registerRoutes(app: FastifyInstance, ctx: Ctx): void {
     }
 
     // Control de uso: la decisión es 100% del server.
-    const user = repo.upsertUser(deviceId, req.ip);
+    const user = await repo.upsertUser(deviceId, req.ip);
     const deny = await usage.checkGenerate(user, req.ip);
     if (deny === "rate_limited") return reply.code(429).send({ error: deny });
     if (deny === "free_limit_reached") return reply.code(402).send({ error: deny });
@@ -147,7 +147,7 @@ export function registerRoutes(app: FastifyInstance, ctx: Ctx): void {
     const useFast = body.speed === "fast" && !!ctx.fast;
     const client = useFast ? ctx.fast! : ctx.meshy;
 
-    const row = repo.createGeneration({
+    const row = await repo.createGeneration({
       userId: user.id,
       kind: body.kind,
       prompt,
@@ -174,24 +174,24 @@ export function registerRoutes(app: FastifyInstance, ctx: Ctx): void {
           aiModel,
         });
       }
-      repo.updateGeneration(row.id, { meshy_task_id: taskId, status: "processing" });
+      await repo.updateGeneration(row.id, { meshy_task_id: taskId, status: "processing" });
     } catch (err) {
-      repo.updateGeneration(row.id, {
+      await repo.updateGeneration(row.id, {
         status: "failed",
         error: String((err as Error).message ?? err).slice(0, 500),
       });
       return reply.code(502).send({ error: "upstream_failed", id: row.id });
     }
 
-    // El uso se cuenta recién cuando Meshy aceptó el job.
-    usage.consume(user, req.ip, row.id);
-    return reply.code(201).send(repo.toDto(repo.getGeneration(row.id)!));
+    // El uso se cuenta recién cuando el proveedor aceptó el job.
+    await usage.consume(user, req.ip, row.id);
+    return reply.code(201).send(await repo.toDto((await repo.getGeneration(row.id))!));
   });
 
   // ---- estado / detalle ----
   app.get("/api/generations/:id", async (req, reply) => {
     const { id } = req.params as { id: string };
-    const row = repo.getGeneration(id);
+    const row = await repo.getGeneration(id);
     if (!row) return reply.code(404).send({ error: "not_found" });
     return repo.toDto(row);
   });
@@ -200,25 +200,27 @@ export function registerRoutes(app: FastifyInstance, ctx: Ctx): void {
   app.get("/api/generations", async (req, reply) => {
     const deviceId = deviceIdOf(req);
     if (!deviceId) return reply.code(400).send({ error: "invalid_input" });
-    return repo.listByUser(deviceId).map((r) => repo.toDto(r));
+    return repo.toDtos(await repo.listByUser(deviceId));
   });
 
   // ---- galería pública (Discover) ----
   app.get("/api/discover", async () => {
-    return repo.listPublic().map((r) => repo.toDto(r));
+    return repo.toDtos(await repo.listPublic());
   });
 
   // ---- comments ----
   app.get("/api/generations/:id/comments", async (req, reply) => {
     const { id } = req.params as { id: string };
-    if (!repo.getGeneration(id)) return reply.code(404).send({ error: "not_found" });
-    const rows = repo.listComments(id);
-    const dto: CommentDto[] = rows.map((c) => ({
-      id: c.id,
-      authorName: repo.getUser(c.user_id)?.display_name ?? "guest",
-      body: c.body,
-      createdAt: c.created_at,
-    }));
+    if (!(await repo.getGeneration(id))) return reply.code(404).send({ error: "not_found" });
+    const rows = await repo.listComments(id);
+    const dto: CommentDto[] = await Promise.all(
+      rows.map(async (c) => ({
+        id: c.id,
+        authorName: (await repo.getUser(c.user_id))?.display_name ?? "guest",
+        body: c.body,
+        createdAt: Number(c.created_at),
+      }))
+    );
     return dto;
   });
 
@@ -226,18 +228,18 @@ export function registerRoutes(app: FastifyInstance, ctx: Ctx): void {
     const deviceId = deviceIdOf(req);
     if (!deviceId) return reply.code(400).send({ error: "invalid_input" });
     const { id } = req.params as { id: string };
-    if (!repo.getGeneration(id)) return reply.code(404).send({ error: "not_found" });
+    if (!(await repo.getGeneration(id))) return reply.code(404).send({ error: "not_found" });
     const { body } = req.body as { body?: string };
     const text = typeof body === "string" ? body.trim() : "";
     if (!text || text.length > MAX_COMMENT_LENGTH)
       return reply.code(400).send({ error: "invalid_input" });
-    const user = repo.upsertUser(deviceId, req.ip);
-    const commentId = repo.addComment(id, user.id, text);
+    const user = await repo.upsertUser(deviceId, req.ip);
+    const comment = await repo.addComment(id, user.id, text);
     const dto: CommentDto = {
-      id: commentId,
+      id: comment.id,
       authorName: user.display_name ?? "guest",
       body: text,
-      createdAt: Date.now(),
+      createdAt: Number(comment.created_at),
     };
     return reply.code(201).send(dto);
   });
@@ -245,16 +247,16 @@ export function registerRoutes(app: FastifyInstance, ctx: Ctx): void {
   // ---- like ----
   app.post("/api/generations/:id/like", async (req, reply) => {
     const { id } = req.params as { id: string };
-    const row = repo.getGeneration(id);
+    const row = await repo.getGeneration(id);
     if (!row) return reply.code(404).send({ error: "not_found" });
-    repo.updateGeneration(id, { likes: row.likes + 1 });
+    await repo.updateGeneration(id, { likes: row.likes + 1 });
     return { likes: row.likes + 1 };
   });
 
   // ---- thumbnail subido por el cliente (para mock/seeds sin render server-side) ----
   app.post("/api/generations/:id/client-thumbnail", async (req, reply) => {
     const { id } = req.params as { id: string };
-    const row = repo.getGeneration(id);
+    const row = await repo.getGeneration(id);
     if (!row) return reply.code(404).send({ error: "not_found" });
     const { dataUri } = req.body as { dataUri?: string };
     if (
@@ -263,14 +265,14 @@ export function registerRoutes(app: FastifyInstance, ctx: Ctx): void {
       dataUri.length > 300_000
     )
       return reply.code(400).send({ error: "invalid_input" });
-    if (!row.thumbnail_data) repo.updateGeneration(id, { thumbnail_data: dataUri });
+    if (!row.thumbnail_data) await repo.updateGeneration(id, { thumbnail_data: dataUri });
     return { ok: true };
   });
 
-  // ---- servir el GLB para el visor (proxy; las URLs de Meshy expiran) ----
+  // ---- servir el GLB para el visor (proxy; las URLs de los proveedores expiran) ----
   app.get("/api/generations/:id/model.glb", async (req, reply) => {
     const { id } = req.params as { id: string };
-    const row = repo.getGeneration(id);
+    const row = await repo.getGeneration(id);
     if (!row?.model_urls) return reply.code(404).send({ error: "not_found" });
     const urls = JSON.parse(row.model_urls) as Record<string, string>;
     if (!urls.glb) return reply.code(404).send({ error: "not_found" });
@@ -282,7 +284,7 @@ export function registerRoutes(app: FastifyInstance, ctx: Ctx): void {
     const { id } = req.params as { id: string };
     const { format } = req.query as { format?: string };
     const fmt = (format ?? "glb").toLowerCase();
-    const row = repo.getGeneration(id);
+    const row = await repo.getGeneration(id);
     if (!row?.model_urls) return reply.code(404).send({ error: "not_found" });
     const urls = JSON.parse(row.model_urls) as Record<string, string>;
     const url = urls[fmt];
@@ -294,11 +296,17 @@ export function registerRoutes(app: FastifyInstance, ctx: Ctx): void {
     return streamModel(reply, url, "application/octet-stream");
   });
 
-  // ---- thumbnail remoto (proxy de Meshy) ----
+  // ---- thumbnail (persistido en storage, o proxy upstream para filas viejas) ----
   app.get("/api/generations/:id/thumbnail", async (req, reply) => {
     const { id } = req.params as { id: string };
-    const row = repo.getGeneration(id);
+    const row = await repo.getGeneration(id);
     if (!row?.thumbnail_url) return reply.code(404).send({ error: "not_found" });
+    if (isStoredRef(row.thumbnail_url)) {
+      const stream = await storage.stream(row.thumbnail_url);
+      if (!stream) return reply.code(404).send({ error: "not_found" });
+      reply.header("Cache-Control", "public, max-age=86400");
+      return reply.type("image/png").send(stream);
+    }
     const res = await fetch(row.thumbnail_url);
     if (!res.ok || !res.body) return reply.code(502).send({ error: "upstream_failed" });
     reply.header("Cache-Control", "public, max-age=86400");
@@ -312,11 +320,17 @@ export function registerRoutes(app: FastifyInstance, ctx: Ctx): void {
     url: string,
     contentType: string
   ) {
-    const local = resolveSampleUrl(url) ?? resolveLocalUrl(url);
-    if (local) {
-      if (!fs.existsSync(local)) return reply.code(404).send({ error: "not_found" });
+    const sample = resolveSampleUrl(url);
+    if (sample) {
+      if (!fs.existsSync(sample)) return reply.code(404).send({ error: "not_found" });
       reply.header("Cache-Control", "public, max-age=86400");
-      return reply.type(contentType).send(fs.createReadStream(local));
+      return reply.type(contentType).send(fs.createReadStream(sample));
+    }
+    if (isStoredRef(url)) {
+      const stream = await storage.stream(url);
+      if (!stream) return reply.code(404).send({ error: "not_found" });
+      reply.header("Cache-Control", "public, max-age=86400");
+      return reply.type(contentType).send(stream);
     }
     const res = await fetch(url);
     if (!res.ok || !res.body) return reply.code(502).send({ error: "upstream_failed" });
@@ -343,8 +357,8 @@ export function registerRoutes(app: FastifyInstance, ctx: Ctx): void {
     const { address } = req.body as { address?: string };
     if (typeof address !== "string" || !/^[a-zA-Z0-9]{20,64}$/.test(address))
       return reply.code(400).send({ error: "invalid_input" });
-    const user = repo.upsertUser(deviceId, req.ip);
-    repo.setWallet(user.id, address);
+    const user = await repo.upsertUser(deviceId, req.ip);
+    await repo.setWallet(user.id, address);
     return { ok: true, address };
   });
 

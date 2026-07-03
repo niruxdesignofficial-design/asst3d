@@ -23,6 +23,20 @@ services:
       # PBR en texto→3D: mejor calidad, +20 créditos por generación (80 vs 60)
       - key: THREEDAI_PBR
         value: "false"
+      # ---- Persistencia externa (gratis): sin esto la DB/modelos se pierden
+      # en cada deploy del plan free. Cargar en el dashboard:
+      # DATABASE_URL = connection string de Neon (Postgres)
+      # R2_* = credenciales del bucket de Cloudflare R2
+      - key: DATABASE_URL
+        sync: false
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET
+        sync: false
       - key: MESHY_API_KEY
         sync: false
       - key: FREE_GENERATIONS_PER_USER

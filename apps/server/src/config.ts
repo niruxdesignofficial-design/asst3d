@@ -37,6 +37,14 @@ export const config = {
   // En Render/hosting: HOST=0.0.0.0 y DATA_DIR apuntando al disco persistente.
   host: process.env.HOST?.trim() || "127.0.0.1",
   dataDir: process.env.DATA_DIR?.trim() || path.resolve(__dirname, "../data"),
+
+  // Persistencia externa (gratis): Postgres (Neon) + Cloudflare R2.
+  // Sin estas vars, la app usa SQLite + disco local (dev / efímero en Render free).
+  databaseUrl: process.env.DATABASE_URL?.trim() || "",
+  r2AccountId: process.env.R2_ACCOUNT_ID?.trim() || "",
+  r2AccessKeyId: process.env.R2_ACCESS_KEY_ID?.trim() || "",
+  r2SecretAccessKey: process.env.R2_SECRET_ACCESS_KEY?.trim() || "",
+  r2Bucket: process.env.R2_BUCKET?.trim() || "",
   samplesDir: path.resolve(__dirname, "../assets/samples"),
   // Build del frontend (apps/web/dist); si existe, el server lo sirve (deploy de un solo servicio).
   webDistDir: path.resolve(__dirname, "../../web/dist"),

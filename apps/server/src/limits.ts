@@ -64,7 +64,7 @@ export class UsageControl {
 
   /** Capacidad global: contador propio + balance real de Meshy. */
   async capacityOk(): Promise<boolean> {
-    if (this.repo.getMonthlyCount() >= this.cfg.globalMonthlyCap) return false;
+    if ((await this.repo.getMonthlyCount()) >= this.cfg.globalMonthlyCap) return false;
     if (!this.cfg.meshyMock) {
       try {
         const balance = await this.meshy.getBalance();
@@ -88,8 +88,8 @@ export class UsageControl {
   }
 
   /** Registra el consumo (se llama recién cuando el job fue aceptado). */
-  consume(user: UserRow, ip: string | null, generationId: string): void {
-    this.repo.incrementUsage(user.id, ip, generationId);
-    this.repo.incrementMonthly();
+  async consume(user: UserRow, ip: string | null, generationId: string): Promise<void> {
+    await this.repo.incrementUsage(user.id, ip, generationId);
+    await this.repo.incrementMonthly();
   }
 }
