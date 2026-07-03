@@ -62,8 +62,8 @@ export const STYLE_PRESETS: StylePreset[] = [
 
 /** AI model options shown in the workspace (mapped server-side to Meshy's ai_model). */
 export const AI_MODELS = [
-  { id: "asst-2", label: "ASST-2 (latest)", meshy: "latest" },
-  { id: "asst-1", label: "ASST-1 (classic)", meshy: "meshy-5" },
+  { id: "asst-2", label: "Formora-2 (latest)", meshy: "latest" },
+  { id: "asst-1", label: "Formora-1 (classic)", meshy: "meshy-5" },
 ] as const;
 export type AiModelId = (typeof AI_MODELS)[number]["id"];
 

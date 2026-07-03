@@ -1,4 +1,4 @@
-# ASST 3D
+# Formora
 
 Web de generación de modelos 3D con IA (via [Meshy API](https://docs.meshy.ai)) pensada para game-devs:
 describís un personaje/objeto/prop por **texto o imagen**, lo ves en un **visor 3D** en el navegador

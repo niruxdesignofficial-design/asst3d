@@ -253,7 +253,7 @@ export function registerRoutes(app: FastifyInstance, ctx: Ctx): void {
     if (!url) return reply.code(404).send({ error: "not_found" });
     reply.header(
       "Content-Disposition",
-      `attachment; filename="asst3d-${id.slice(0, 8)}.${fmt}"`
+      `attachment; filename="formora-${id.slice(0, 8)}.${fmt}"`
     );
     return streamModel(reply, url, "application/octet-stream");
   });

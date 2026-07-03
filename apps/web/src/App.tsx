@@ -27,7 +27,7 @@ export default function App() {
         <div className="footer-grid">
           <div className="footer-brand">
             <div className="nav-logo">
-              <span className="nav-logo-mark">▲</span> ASST 3D
+              <img src="/logo.svg" alt="" className="nav-logo-img" /> Formora
             </div>
             <p className="muted small">
               AI 3D model generation for game developers. Describe it, preview it, ship it.
@@ -53,7 +53,7 @@ export default function App() {
           </div>
         </div>
         <div className="footer-legal muted small">
-          © {new Date().getFullYear()} ASST 3D · Sample gallery models from the Khronos glTF
+          © {new Date().getFullYear()} Formora · Sample gallery models from the Khronos glTF
           Sample Assets (CC0 / CC BY 4.0)
         </div>
       </footer>

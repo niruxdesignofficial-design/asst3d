@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="edge" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#c4b5fd"/>
+      <stop offset="0.55" stop-color="#8b5cf6"/>
+      <stop offset="1" stop-color="#6d28d9"/>
+    </linearGradient>
+    <linearGradient id="face" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#a78bfa"/>
+      <stop offset="1" stop-color="#7c3aed"/>
+    </linearGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="10" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- low-poly hexagonal gem -->
+  <g filter="url(#glow)" stroke="url(#edge)" stroke-width="7" stroke-linejoin="round" fill="none">
+    <!-- outer hexagon (pointy top) -->
+    <polygon points="256,28 452,142 452,370 256,484 60,370 60,142"/>
+    <!-- inner prism face -->
+    <polygon points="256,120 372,188 372,324 256,392 140,324 140,188" stroke-width="5"/>
+    <!-- facet lines -->
+    <path d="M256,28 L256,120 M452,142 L372,188 M452,370 L372,324 M256,484 L256,392 M60,370 L140,324 M60,142 L140,188" stroke-width="4" opacity="0.85"/>
+    <path d="M60,142 L256,120 M452,142 L256,120 M60,370 L256,392 M452,370 L256,392" stroke-width="2.5" opacity="0.45"/>
+  </g>
+
+  <!-- angular F -->
+  <g filter="url(#glow)">
+    <path fill="url(#face)" stroke="#e9dcff" stroke-width="4" stroke-linejoin="round"
+      d="M205,168 L340,168 L322,214 L252,214 L252,246 L318,246 L300,292 L252,292 L252,344 L205,368 Z"/>
+  </g>
+</svg>

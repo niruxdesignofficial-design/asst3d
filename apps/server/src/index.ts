@@ -43,7 +43,7 @@ app
   .listen({ port: config.port, host: config.host })
   .then(() => {
     app.log.info(
-      `ASST 3D server en http://127.0.0.1:${config.port} (meshy=${config.meshyMock ? "MOCK" : "REAL"})`
+      `Formora server en http://${config.host}:${config.port} (meshy=${config.meshyMock ? "MOCK" : "REAL"})`
     );
   })
   .catch((err) => {

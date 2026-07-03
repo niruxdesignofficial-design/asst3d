@@ -1,4 +1,4 @@
-/* ===== ASST 3D design tokens — violet theme ===== */
+/* ===== Formora design tokens — violet theme ===== */
 :root {
   --bg: #0b0812;
   --bg-elev: #120e1c;
@@ -89,6 +89,11 @@ a {
 }
 .nav-logo-mark {
   color: var(--accent);
+  filter: drop-shadow(0 0 8px var(--glow));
+}
+.nav-logo-img {
+  width: 30px;
+  height: 30px;
   filter: drop-shadow(0 0 8px var(--glow));
 }
 .nav-links {

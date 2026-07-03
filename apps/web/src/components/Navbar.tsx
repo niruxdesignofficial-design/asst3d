@@ -10,7 +10,7 @@ export function Navbar({ me }: Props) {
     <>
       <header className="nav">
         <Link to="/" className="nav-logo">
-          <span className="nav-logo-mark">▲</span> ASST 3D
+          <img src="/logo.svg" alt="" className="nav-logo-img" /> Formora
         </Link>
         <nav className="nav-links">
           <NavLink to="/" end>
