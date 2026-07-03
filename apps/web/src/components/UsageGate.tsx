@@ -1,11 +1,15 @@
+import { PromoCode } from "./PromoCode";
+
 interface Props {
   code: string;
   paymentsEnabled: boolean;
   onDismiss: () => void;
+  /** refresca /api/me tras canjear un código promo */
+  onRedeemed?: () => void;
 }
 
 /** Blocking banner when the server denies a generation. */
-export function UsageGate({ code, paymentsEnabled, onDismiss }: Props) {
+export function UsageGate({ code, paymentsEnabled, onDismiss, onRedeemed }: Props) {
   let title = "";
   let body = "";
   if (code === "free_limit_reached") {
@@ -29,6 +33,9 @@ export function UsageGate({ code, paymentsEnabled, onDismiss }: Props) {
       <div className="gate-box">
         <h3>{title}</h3>
         <p className="muted">{body}</p>
+        {code === "free_limit_reached" && (
+          <PromoCode onRedeemed={() => onRedeemed?.()} />
+        )}
         <div className="gate-actions">
           {code === "free_limit_reached" && (
             <button

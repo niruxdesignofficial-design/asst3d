@@ -3,6 +3,7 @@ import { useLocation } from "react-router-dom";
 import type { GenerationDto, MeDto } from "@asst3d/shared";
 import { getGeneration, listMine, uploadThumbnail } from "../lib/api";
 import { GeneratePanel } from "../components/GeneratePanel";
+import { PromoCode } from "../components/PromoCode";
 import { GenerationCard } from "../components/GenerationCard";
 import { ModelModal } from "../components/ModelModal";
 import { ModelViewer } from "../components/ModelViewer";
@@ -78,6 +79,7 @@ export function Workspace({ me, refreshMe }: Props) {
               : `${me.freeRemaining} of ${me.freeLimit} free generations left`}
           </p>
         )}
+        <PromoCode onRedeemed={refreshMe} />
       </aside>
 
       <section className="ws-center">
@@ -183,6 +185,7 @@ export function Workspace({ me, refreshMe }: Props) {
           code={gate}
           paymentsEnabled={me?.paymentsEnabled ?? false}
           onDismiss={() => setGate(null)}
+          onRedeemed={refreshMe}
         />
       )}
     </main>

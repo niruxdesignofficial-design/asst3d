@@ -610,6 +610,37 @@ a {
   color: var(--danger);
   font-size: 0.85rem;
 }
+/* promo code redeem */
+.promo-toggle {
+  background: none;
+  border: none;
+  color: var(--accent-2);
+  font-size: 0.82rem;
+  padding: 8px 0;
+  text-align: left;
+}
+.promo-toggle:hover {
+  text-decoration: underline;
+}
+.promo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+.promo-row {
+  display: flex;
+  gap: 8px;
+}
+.promo-input {
+  flex: 1;
+  text-transform: uppercase;
+}
+.promo-ok {
+  color: var(--ok);
+  font-size: 0.85rem;
+}
+
 .lang-hint {
   border: 1px solid rgba(255, 196, 107, 0.35);
   background: rgba(255, 196, 107, 0.07);

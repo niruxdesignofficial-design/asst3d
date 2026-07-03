@@ -27,6 +27,9 @@ services:
         sync: false
       - key: FREE_GENERATIONS_PER_USER
         value: "3"
+      # Códigos promo (una vez por usuario): "CODIGO:gens,OTRO:5"
+      - key: PROMO_CODES
+        value: "FREE3:3"
       - key: GLOBAL_MONTHLY_CAP
         value: "200"
       - key: MESHY_MIN_BALANCE

@@ -291,6 +291,7 @@ export function Home({ me, refreshMe }: Props) {
           code={gate}
           paymentsEnabled={me?.paymentsEnabled ?? false}
           onDismiss={() => setGate(null)}
+          onRedeemed={refreshMe}
         />
       )}
     </main>

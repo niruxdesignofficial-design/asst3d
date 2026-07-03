@@ -116,6 +116,26 @@ describe("UsageControl (server-authoritative)", () => {
     expect(await usage.checkGenerate(user, null)).toBe("rate_limited");
   });
 
+  it("un código promo suma generaciones y solo se canjea una vez", async () => {
+    const usage = new UsageControl(repo, meshy, cfg({ rateLimitPerMinute: 100, rateLimitPerHour: 100 }));
+    let user = repo.upsertUser("device-1", "1.1.1.1");
+    // agotar las 3 gratis base
+    for (let i = 0; i < 3; i++) usage.consume(repo.getUser("device-1")!, "1.1.1.1", `g${i}`);
+    user = repo.getUser("device-1")!;
+    expect(await usage.checkGenerate(user, "1.1.1.1")).toBe("free_limit_reached");
+
+    // canje FREE3 => +3
+    expect(repo.redeemCode(user.id, "FREE3", 3)).toBe(true);
+    user = repo.getUser("device-1")!;
+    expect(usage.freeAllowance(user)).toBe(6);
+    expect(usage.freeRemaining(user)).toBe(3);
+    expect(await usage.checkGenerate(user, "1.1.1.1")).toBeNull();
+
+    // segundo canje del mismo código: rechazado, sin duplicar bonus
+    expect(repo.redeemCode(user.id, "FREE3", 3)).toBe(false);
+    expect(usage.freeAllowance(repo.getUser("device-1")!)).toBe(6);
+  });
+
   it("aplica rate-limit por IP aunque cambie el device", async () => {
     const usage = new UsageControl(repo, meshy, cfg({ rateLimitPerMinute: 2, rateLimitPerHour: 100 }));
     const ip = "9.9.9.9";

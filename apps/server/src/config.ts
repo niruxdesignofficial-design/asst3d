@@ -61,6 +61,21 @@ export const config = {
 
   paymentsEnabled: process.env.PAYMENTS_ENABLED === "true",
   tokenGateAddress: process.env.TOKEN_GATE_ADDRESS?.trim() || "",
+
+  // Códigos promo: "CODE:gens,OTRO:5" — canjeables una vez por usuario.
+  promoCodes: parsePromoCodes(process.env.PROMO_CODES ?? "FREE3:3"),
 };
+
+function parsePromoCodes(raw: string): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const part of raw.split(",")) {
+    const [code, n] = part.split(":");
+    const bonus = Number(n);
+    if (code?.trim() && Number.isInteger(bonus) && bonus > 0 && bonus <= 100) {
+      map.set(code.trim().toUpperCase(), bonus);
+    }
+  }
+  return map;
+}
 
 export type Config = typeof config;

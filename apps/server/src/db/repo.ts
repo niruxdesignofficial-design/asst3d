@@ -12,6 +12,7 @@ export interface UserRow {
   created_at: number;
   last_ip: string | null;
   generations_used: number;
+  bonus_generations: number;
   wallet_address: string | null;
   token_access: number;
   display_name: string | null;
@@ -69,6 +70,28 @@ export class Repo {
 
   setWallet(userId: string, address: string | null): void {
     this.db.prepare(`UPDATE users SET wallet_address = ? WHERE id = ?`).run(address, userId);
+  }
+
+  /**
+   * Canjea un código promo: atómico, una sola vez por usuario+código.
+   * Devuelve false si ese usuario ya lo había canjeado.
+   */
+  redeemCode(userId: string, code: string, bonus: number): boolean {
+    const tx = this.db.transaction(() => {
+      this.db
+        .prepare(`INSERT INTO redeemed_codes (user_id, code, at) VALUES (?, ?, ?)`)
+        .run(userId, code, Date.now());
+      this.db
+        .prepare(`UPDATE users SET bonus_generations = bonus_generations + ? WHERE id = ?`)
+        .run(bonus, userId);
+    });
+    try {
+      tx();
+      return true;
+    } catch (err) {
+      if (String(err).includes("UNIQUE") || String(err).includes("PRIMARY")) return false;
+      throw err;
+    }
   }
 
   setDisplayName(userId: string, name: string): void {

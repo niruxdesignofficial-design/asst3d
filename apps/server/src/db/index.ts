@@ -49,6 +49,12 @@ const MIGRATIONS: string[] = [
     generation_id TEXT,
     at INTEGER NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS redeemed_codes (
+    user_id TEXT NOT NULL,
+    code TEXT NOT NULL,
+    at INTEGER NOT NULL,
+    PRIMARY KEY (user_id, code)
+  )`,
   `CREATE TABLE IF NOT EXISTS comments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     generation_id TEXT NOT NULL,
@@ -59,11 +65,24 @@ const MIGRATIONS: string[] = [
   `CREATE INDEX IF NOT EXISTS idx_comments_gen ON comments(generation_id, created_at)`,
 ];
 
+// ALTERs sobre tablas existentes: SQLite no tiene IF NOT EXISTS para columnas,
+// así que se intentan y se ignora el "duplicate column" en DBs ya migradas.
+const COLUMN_MIGRATIONS: string[] = [
+  `ALTER TABLE users ADD COLUMN bonus_generations INTEGER NOT NULL DEFAULT 0`,
+];
+
 export function openDb(dbPath?: string): Database.Database {
   const file = dbPath ?? path.join(config.dataDir, "asst3d.db");
   if (file !== ":memory:") fs.mkdirSync(path.dirname(file), { recursive: true });
   const db = new Database(file);
   db.pragma("journal_mode = WAL");
   for (const sql of MIGRATIONS) db.exec(sql);
+  for (const sql of COLUMN_MIGRATIONS) {
+    try {
+      db.exec(sql);
+    } catch (err) {
+      if (!String(err).includes("duplicate column")) throw err;
+    }
+  }
   return db;
 }

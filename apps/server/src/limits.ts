@@ -46,8 +46,20 @@ export class UsageControl {
     return user.token_access === 1;
   }
 
+  /** Total gratis del usuario: base + bonus por códigos promo canjeados. */
+  freeAllowance(user: UserRow): number {
+    return this.cfg.freeGenerationsPerUser + (user.bonus_generations ?? 0);
+  }
+
   freeRemaining(user: UserRow): number {
-    return Math.max(0, this.cfg.freeGenerationsPerUser - user.generations_used);
+    return Math.max(0, this.freeAllowance(user) - user.generations_used);
+  }
+
+  /** Rate-limit para intentos de canje de códigos (anti fuerza bruta). */
+  codeAttemptOk(deviceId: string, ip: string | null): boolean {
+    if (!this.rateOk(`code:d:${deviceId}`)) return false;
+    if (ip && !this.rateOk(`code:ip:${ip}`)) return false;
+    return true;
   }
 
   /** Capacidad global: contador propio + balance real de Meshy. */

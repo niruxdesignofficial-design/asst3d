@@ -48,7 +48,7 @@ export function registerRoutes(app: FastifyInstance, ctx: Ctx): void {
     const user = repo.upsertUser(deviceId, req.ip);
     const me: MeDto = {
       deviceId,
-      freeLimit: config.freeGenerationsPerUser,
+      freeLimit: usage.freeAllowance(user),
       freeUsed: user.generations_used,
       freeRemaining: usage.freeRemaining(user),
       capacityOk: await usage.capacityOk(),
@@ -57,6 +57,33 @@ export function registerRoutes(app: FastifyInstance, ctx: Ctx): void {
       walletAddress: user.wallet_address,
     };
     return me;
+  });
+
+  // ---- canje de código promo (ej. FREE3 => +3 generaciones gratis) ----
+  app.post("/api/redeem-code", async (req, reply) => {
+    const deviceId = deviceIdOf(req);
+    if (!deviceId) return reply.code(400).send({ error: "invalid_input" });
+    const { code } = req.body as { code?: string };
+    if (typeof code !== "string" || !/^[A-Za-z0-9_-]{2,32}$/.test(code.trim()))
+      return reply.code(400).send({ error: "invalid_input" });
+    if (!usage.codeAttemptOk(deviceId, req.ip))
+      return reply.code(429).send({ error: "rate_limited" });
+
+    const normalized = code.trim().toUpperCase();
+    const bonus = config.promoCodes.get(normalized);
+    if (!bonus) return reply.code(404).send({ error: "invalid_code" });
+
+    const user = repo.upsertUser(deviceId, req.ip);
+    if (!repo.redeemCode(user.id, normalized, bonus))
+      return reply.code(409).send({ error: "already_redeemed" });
+
+    const updated = repo.getUser(user.id)!;
+    return {
+      ok: true,
+      bonus,
+      freeRemaining: usage.freeRemaining(updated),
+      freeLimit: usage.freeAllowance(updated),
+    };
   });
 
   // ---- crear generación ----

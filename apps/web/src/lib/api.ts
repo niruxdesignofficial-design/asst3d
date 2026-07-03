@@ -70,6 +70,12 @@ export const uploadThumbnail = (id: string, dataUri: string) =>
 export const downloadUrl = (id: string, format: string) =>
   `/api/generations/${id}/download?format=${format}`;
 
+export const redeemCode = (code: string) =>
+  api<{ ok: true; bonus: number; freeRemaining: number; freeLimit: number }>(
+    "/api/redeem-code",
+    { method: "POST", body: JSON.stringify({ code }) }
+  );
+
 export const listComments = (id: string) =>
   api<CommentDto[]>(`/api/generations/${id}/comments`);
 
