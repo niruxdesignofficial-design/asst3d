@@ -62,8 +62,9 @@ export const STYLE_PRESETS: StylePreset[] = [
 
 /** AI model options shown in the workspace (mapped server-side to Meshy's ai_model). */
 export const AI_MODELS = [
-  { id: "asst-2", label: "Formora-2 (latest)", meshy: "latest" },
-  { id: "asst-1", label: "Formora-1 (classic)", meshy: "meshy-5" },
+  // El primero es el default de la UI — meshy-5 cuesta 4x menos que el último modelo
+  { id: "asst-1", label: "Formora-1 (fast)", meshy: "meshy-5" },
+  { id: "asst-2", label: "Formora-2 (ultra)", meshy: "latest" },
 ] as const;
 export type AiModelId = (typeof AI_MODELS)[number]["id"];
 

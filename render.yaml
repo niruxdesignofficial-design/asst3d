@@ -13,13 +13,16 @@ services:
         value: 0.0.0.0
       - key: NODE_VERSION
         value: 20.19.0
-      # Sin keys la app corre en modo MOCK (no gasta créditos).
-      # Cargá THREEDAI_API_KEY (o MESHY_API_KEY) en el dashboard de Render (Environment)
-      # y poné PROVIDER=3daistudio (o meshy) para generación real.
+      # Proveedor activo: Meshy (pagado). Solo falta pegar MESHY_API_KEY en el
+      # dashboard de Render (Environment) — sin la key, generar da error.
+      # Para volver al modo demo sin gastar créditos: PROVIDER=mock.
       - key: PROVIDER
-        value: mock
+        value: meshy
       - key: THREEDAI_API_KEY
         sync: false
+      # PBR en texto→3D: mejor calidad, +20 créditos por generación (80 vs 60)
+      - key: THREEDAI_PBR
+        value: "false"
       - key: MESHY_API_KEY
         sync: false
       - key: FREE_GENERATIONS_PER_USER

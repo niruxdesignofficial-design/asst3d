@@ -24,6 +24,8 @@ export interface ImageTo3DOptions {
   imageDataUri: string;
   modelType: "standard" | "lowpoly";
   targetPolycount?: number;
+  /** Meshy ai_model id (e.g. "meshy-5", "latest") */
+  aiModel?: string;
 }
 
 /**

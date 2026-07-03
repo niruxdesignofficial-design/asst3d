@@ -30,7 +30,8 @@ export class RealMeshyClient implements MeshyClient {
     const body: Record<string, unknown> = {
       mode: "preview",
       prompt: opts.prompt,
-      ai_model: opts.aiModel ?? "latest",
+      // meshy-5 = 5 créditos el preview; "latest" (meshy-6) = 20
+      ai_model: opts.aiModel ?? "meshy-5",
       model_type: opts.modelType,
       target_formats: ["glb", "fbx", "obj", "usdz"],
     };
@@ -60,6 +61,7 @@ export class RealMeshyClient implements MeshyClient {
   async createImageTo3D(opts: ImageTo3DOptions): Promise<string> {
     const body: Record<string, unknown> = {
       image_url: opts.imageDataUri,
+      ai_model: opts.aiModel ?? "meshy-5",
       model_type: opts.modelType,
       should_texture: true,
       enable_pbr: true,

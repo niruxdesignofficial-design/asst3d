@@ -137,6 +137,7 @@ export function registerRoutes(app: FastifyInstance, ctx: Ctx): void {
           imageDataUri: body.imageDataUri!,
           modelType,
           targetPolycount,
+          aiModel,
         });
       }
       repo.updateGeneration(row.id, { meshy_task_id: taskId, status: "processing" });

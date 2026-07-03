@@ -48,17 +48,16 @@ interface StatusResponse {
 /** El pro exige face_count 40k–1.5M; fuera de ese rango se usa generate_type LowPoly. */
 function proBody(opts: {
   prompt?: string;
-  imageBase64?: string;
   modelType: "standard" | "lowpoly";
   targetPolycount?: number;
 }): Record<string, unknown> {
   const body: Record<string, unknown> = {
     model: "3.1",
-    enable_pbr: true,
+    // PBR = +20 créditos; configurable por env para estirar el presupuesto.
+    enable_pbr: config.threedaiPbr,
     generate_type: opts.modelType === "lowpoly" ? "LowPoly" : "Normal",
   };
   if (opts.prompt) body.prompt = opts.prompt.slice(0, 1024);
-  if (opts.imageBase64) body.image = opts.imageBase64;
   if (opts.targetPolycount && opts.targetPolycount >= 40_000 && opts.targetPolycount <= 1_500_000) {
     body.face_count = opts.targetPolycount;
   }
@@ -89,17 +88,19 @@ export class ThreeDAIClient implements MeshyClient {
   }
 
   async createImageTo3D(opts: ImageTo3DOptions): Promise<string> {
-    // La API espera base64 pelado, sin el prefijo data:...;base64,
-    const base64 = opts.imageDataUri.replace(/^data:[a-z/+.-]+;base64,/i, "");
-    const r = await apiFetch<SubmitResponse>("/v1/3d-models/tencent/generate/pro/", {
+    // Imagen→3D va por TRELLIS.2: ~32 créditos vs 60-80 de Hunyuan Pro,
+    // salida GLB directa y mucho más rápido (30-50s).
+    const body: Record<string, unknown> = {
+      image: opts.imageDataUri, // acepta el data URI completo
+      resolution: "1024",
+      textures: true,
+      texture_size: 1024,
+      generate_thumbnail: true,
+    };
+    if (opts.targetPolycount) body.decimation_target = opts.targetPolycount;
+    const r = await apiFetch<SubmitResponse>("/v1/3d-models/trellis2/generate/", {
       method: "POST",
-      body: JSON.stringify(
-        proBody({
-          imageBase64: base64,
-          modelType: opts.modelType,
-          targetPolycount: opts.targetPolycount,
-        })
-      ),
+      body: JSON.stringify(body),
     });
     return r.task_id;
   }
@@ -120,11 +121,15 @@ export class ThreeDAIClient implements MeshyClient {
           task_error: { message: "finished without a 3D_MODEL asset" },
         };
       }
+      const thumb = r.results?.find(
+        (x) => x.asset && (x.asset_type === "THUMBNAIL" || x.asset_type === "IMAGE")
+      );
       return {
         id: taskId,
         status: "SUCCEEDED",
         progress: 100,
         model_urls: { glb: model.asset },
+        thumbnail_url: thumb?.asset,
       };
     }
 

@@ -45,10 +45,13 @@ export const config = {
   meshyBaseUrl: "https://api.meshy.ai",
   threedaiApiKey: threedaiKey,
   threedaiBaseUrl: "https://api.3daistudio.com",
+  // Texturas PBR en Hunyuan Pro: +20 créditos por generación (80 vs 60).
+  // Apagado por defecto para estirar los créditos; THREEDAI_PBR=true lo prende.
+  threedaiPbr: process.env.THREEDAI_PBR === "true",
   provider,
-  // Mock si no hay ninguna key (o PROVIDER=mock / MESHY_MOCK=true legacy):
-  // nunca rompe ni gasta créditos por accidente.
-  meshyMock: provider === "mock" || process.env.MESHY_MOCK === "true",
+  // Mock solo cuando el provider resuelto es mock. (La var legacy MESHY_MOCK
+  // ya no manda: si PROVIDER dice meshy/3daistudio, se genera de verdad.)
+  meshyMock: provider === "mock",
 
   freeGenerationsPerUser: int("FREE_GENERATIONS_PER_USER", 3),
   globalMonthlyCap: int("GLOBAL_MONTHLY_CAP", 200),
