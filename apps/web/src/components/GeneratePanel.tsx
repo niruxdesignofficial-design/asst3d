@@ -13,6 +13,19 @@ import {
 } from "@asst3d/shared";
 import { ApiError, generate } from "../lib/api";
 
+/**
+ * Heurística liviana: el modelo 3D entiende inglés (y chino); prompts en
+ * español/portugués suelen generar el objeto equivocado. Detectamos señales
+ * comunes para sugerir escribir en inglés — solo un aviso, nunca bloquea.
+ */
+function looksNonEnglish(prompt: string): boolean {
+  if (prompt.trim().length < 4) return false;
+  if (/[áéíóúñü¿¡ãõç]/i.test(prompt)) return true;
+  return /\b(que|una|unos?|està|esta|con|para|pero|perro|gato|hombre|mujer|casa|coche|árbol|niño|estilo|parece|hecho|muy)\b/i.test(
+    prompt
+  );
+}
+
 interface Props {
   onStarted: (gen: GenerationDto) => void;
   onDenied: (code: string) => void;
@@ -113,17 +126,26 @@ export function GeneratePanel({ onStarted, onDenied, compact = false, initialPro
       </div>
 
       {kind === "text" ? (
-        <textarea
-          className="gen-input"
-          placeholder="Describe your model… e.g. rusty sentinel robot with one glowing eye"
-          value={prompt}
-          maxLength={500}
-          rows={compact ? 2 : 4}
-          onChange={(e) => setPrompt(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submit();
-          }}
-        />
+        <>
+          <textarea
+            className="gen-input"
+            placeholder="Describe your model… e.g. rusty sentinel robot with one glowing eye"
+            value={prompt}
+            maxLength={500}
+            rows={compact ? 2 : 4}
+            onChange={(e) => setPrompt(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submit();
+            }}
+          />
+          {looksNonEnglish(prompt) && (
+            <div className="lang-hint">
+              💡 The AI understands <strong>English</strong> best — non-English prompts often
+              produce the wrong object. Try describing it in English (e.g. “a monkey that looks
+              like a man”).
+            </div>
+          )}
+        </>
       ) : (
         <div
           className={`dropzone ${image ? "dropzone-full" : ""}`}
