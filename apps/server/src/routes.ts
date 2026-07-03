@@ -333,6 +333,8 @@ export function registerRoutes(app: FastifyInstance, ctx: Ctx): void {
       const stream = await getStorage().stream(url);
       if (!stream) return reply.code(404).send({ error: "not_found" });
       reply.header("Cache-Control", "public, max-age=86400");
+      const size = await getStorage().size(url);
+      if (size) reply.header("Content-Length", size);
       return reply.type(contentType).send(stream);
     }
     const res = await fetch(url);

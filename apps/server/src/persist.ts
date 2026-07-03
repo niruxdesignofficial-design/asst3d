@@ -1,3 +1,4 @@
+import { compressGlb } from "./compress.js";
 import { getStorage, isStoredRef } from "./storage.js";
 
 /**
@@ -22,11 +23,9 @@ export async function persistModels(
 
   const glb = urls.glb;
   if (glb && !glb.startsWith("sample://") && !isStoredRef(glb)) {
-    out.glb = await getStorage().put(
-      `${generationId}.glb`,
-      await download(glb),
-      "model/gltf-binary"
-    );
+    // Comprimir antes de guardar (5-10x más chico); si falla, guarda el original.
+    const { data } = await compressGlb(await download(glb));
+    out.glb = await getStorage().put(`${generationId}.glb`, data, "model/gltf-binary");
   }
 
   let thumb: string | null = thumbnailUrl ?? null;

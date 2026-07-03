@@ -15,6 +15,7 @@ describe("DbStorage (blobs dentro de la DB)", () => {
     const storage = new DbStorage(db, {
       put: async () => "local://x",
       stream: async () => null,
+      size: async () => null,
     });
 
     const data = Buffer.from("glTF-fake-binary-content-1234567890");
@@ -29,7 +30,11 @@ describe("DbStorage (blobs dentro de la DB)", () => {
 
   it("sobrescribe la misma key sin duplicar y devuelve null si no existe", async () => {
     const db = await openDb(":memory:");
-    const storage = new DbStorage(db, { put: async () => "x", stream: async () => null });
+    const storage = new DbStorage(db, {
+      put: async () => "x",
+      stream: async () => null,
+      size: async () => null,
+    });
 
     await storage.put("k.glb", Buffer.from("v1"), "model/gltf-binary");
     await storage.put("k.glb", Buffer.from("v2-mas-largo"), "model/gltf-binary");

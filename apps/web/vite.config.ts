@@ -14,6 +14,8 @@ export default defineConfig({
       "three",
       "three/examples/jsm/loaders/GLTFLoader.js",
       "three/examples/jsm/controls/OrbitControls.js",
+      "three/examples/jsm/environments/RoomEnvironment.js",
+      "three/examples/jsm/libs/meshopt_decoder.module.js",
     ],
   },
   server: {

@@ -4,6 +4,13 @@ Web de generación de modelos 3D con IA (via [Meshy API](https://docs.meshy.ai))
 describís un personaje/objeto/prop por **texto o imagen**, lo ves en un **visor 3D** en el navegador
 y lo descargás en **GLB / FBX / OBJ / USDZ** listo para tu motor de juego.
 
+## Producción: evitar el cold start (plan free de Render)
+
+El plan free de Render duerme el servicio tras ~15 min sin tráfico y la primera visita
+tarda ~40s en despertar. Solución gratis: crear un monitor en [uptimerobot.com](https://uptimerobot.com)
+(free) que haga GET a `https://asst3d.onrender.com/api/health` cada 5 minutos — el servicio
+queda siempre despierto y de paso te avisa por mail si la web se cae.
+
 ## Correr en desarrollo
 
 ```bash

@@ -22,6 +22,8 @@ export interface ModelStorage {
   put(key: string, data: Buffer, contentType: string): Promise<string>;
   /** stream de lectura para una ref persistida; null si no existe */
   stream(ref: string): Promise<Readable | null>;
+  /** tamaño en bytes si es conocible barato; null si no */
+  size(ref: string): Promise<number | null>;
 }
 
 class DiskStorage implements ModelStorage {
@@ -44,6 +46,16 @@ class DiskStorage implements ModelStorage {
     const file = path.join(this.dir(), path.basename(ref.slice("local://".length)));
     if (!fs.existsSync(file)) return null;
     return fs.createReadStream(file);
+  }
+
+  async size(ref: string): Promise<number | null> {
+    if (!ref.startsWith("local://")) return null;
+    const file = path.join(this.dir(), path.basename(ref.slice("local://".length)));
+    try {
+      return fs.statSync(file).size;
+    } catch {
+      return null;
+    }
   }
 }
 
@@ -72,6 +84,16 @@ export class DbStorage implements ModelStorage {
     ]);
     if (!row?.data) return null;
     return Readable.from(Buffer.isBuffer(row.data) ? row.data : Buffer.from(row.data));
+  }
+
+  async size(ref: string): Promise<number | null> {
+    if (ref.startsWith("local://")) return this.fallback.size(ref);
+    if (!ref.startsWith("db://")) return null;
+    const row = await this.db.get<{ n: number }>(
+      `SELECT length(data) AS n FROM blobs WHERE key = ?`,
+      [ref.slice("db://".length)]
+    );
+    return row?.n ?? null;
   }
 }
 
@@ -113,6 +135,11 @@ class R2Storage implements ModelStorage {
     } catch {
       return null;
     }
+  }
+
+  async size(ref: string): Promise<number | null> {
+    if (!ref.startsWith("r2://")) return this.fallback.size(ref);
+    return null; // HeadObject por pedido no vale la pena; el guard del cliente tolera null
   }
 }
 

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
+  applyStudioEnvironment,
+  createContactShadow,
   createStudioScene,
   loadGlb,
   normalizeObject,
@@ -47,11 +49,30 @@ export function ModelViewer({ src, autoRotate = true, onSnapshot, onStats, showS
   const mountRef = useRef<HTMLDivElement>(null);
   const [wireframe, setWireframe] = useState(false);
   const [spin, setSpin] = useState(autoRotate);
+  const [lightBg, setLightBg] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<MeshStats | null>(null);
   const modelRef = useRef<THREE.Group | null>(null);
   const controlsRef = useRef<InstanceType<typeof OrbitControls> | null>(null);
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const sceneRef = useRef<THREE.Scene | null>(null);
+
+  const snapshot = () => {
+    const r = rendererRef.current;
+    if (!r) return;
+    const a = document.createElement("a");
+    a.href = r.domElement.toDataURL("image/png");
+    a.download = "formora-model.png";
+    a.click();
+  };
+
+  const fullscreen = () => {
+    const el = mountRef.current?.parentElement;
+    if (!el) return;
+    if (document.fullscreenElement) void document.exitFullscreen();
+    else void el.requestFullscreen().catch(() => {});
+  };
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -63,7 +84,12 @@ export function ModelViewer({ src, autoRotate = true, onSnapshot, onStats, showS
     renderer.toneMappingExposure = 1.15;
     mount.appendChild(renderer.domElement);
 
+    rendererRef.current = renderer;
     const scene = createStudioScene();
+    sceneRef.current = scene;
+    // Iluminación por entorno: los materiales PBR se ven nivel estudio.
+    applyStudioEnvironment(renderer, scene);
+    scene.add(createContactShadow());
     const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
     camera.position.set(2.2, 1.6, 3);
 
@@ -156,6 +182,12 @@ export function ModelViewer({ src, autoRotate = true, onSnapshot, onStats, showS
     if (controlsRef.current) controlsRef.current.autoRotate = spin;
   }, [spin]);
 
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!scene) return;
+    scene.background = lightBg ? new THREE.Color(0xe8e6ef) : null;
+  }, [lightBg, loading]);
+
   const fmt = (n: number) => n.toLocaleString("en-US");
 
   return (
@@ -200,6 +232,19 @@ export function ModelViewer({ src, autoRotate = true, onSnapshot, onStats, showS
             title="Toggle auto-rotate"
           >
             Spin
+          </button>
+          <button
+            className={`chip ${lightBg ? "chip-on" : ""}`}
+            onClick={() => setLightBg((v) => !v)}
+            title="Toggle light background"
+          >
+            ◐
+          </button>
+          <button className="chip" onClick={snapshot} title="Save a PNG snapshot">
+            📷
+          </button>
+          <button className="chip" onClick={fullscreen} title="Fullscreen">
+            ⛶
           </button>
         </div>
         <span className="viewer-hint">Drag to orbit · scroll to zoom</span>

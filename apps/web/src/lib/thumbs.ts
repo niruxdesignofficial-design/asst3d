@@ -22,10 +22,22 @@ function getRenderer(): THREE.WebGLRenderer {
   return renderer;
 }
 
+/** GLBs enormes congelan el main thread al parsear: mejor placeholder que freeze. */
+const MAX_THUMB_GLB_BYTES = 15 * 1024 * 1024;
+
 async function renderOnce(url: string): Promise<string> {
   const cacheKey = `asst3d_thumb:${url}`;
   const stored = localStorage.getItem(cacheKey);
   if (stored) return stored;
+
+  try {
+    const head = await fetch(url, { method: "HEAD" });
+    const len = Number(head.headers.get("content-length") ?? 0);
+    if (len > MAX_THUMB_GLB_BYTES) throw new Error("glb too large for client thumbnail");
+  } catch (err) {
+    if (String(err).includes("too large")) throw err;
+    /* HEAD no soportado: seguimos e intentamos igual */
+  }
 
   const scene = createStudioScene();
   const model = await loadGlb(url);
