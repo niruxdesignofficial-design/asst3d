@@ -226,6 +226,24 @@ a {
 .nav-cta {
   padding: 8px 18px;
 }
+.nav-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 0.95rem;
+  transition: border-color 0.12s ease, color 0.12s ease, transform 0.12s ease;
+}
+.nav-x:hover {
+  border-color: var(--accent);
+  color: var(--accent-2);
+  transform: translateY(-1px);
+}
 
 .promo-strip {
   display: flex;
@@ -1457,7 +1475,7 @@ a {
   max-width: 1280px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
   gap: 30px;
 }
 .footer-brand p {

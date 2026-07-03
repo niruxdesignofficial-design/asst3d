@@ -67,6 +67,15 @@ export function Navbar({ me }: Props) {
               ⚡ {me.hasTokenAccess ? "∞" : `${me.freeRemaining}/${me.freeLimit}`} free
             </span>
           )}
+          <a
+            className="nav-x"
+            href="https://x.com/Formora_3D"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Follow @Formora_3D on X"
+          >
+            𝕏
+          </a>
           <Link to="/workspace" className="btn-primary nav-cta">
             Workspace
           </Link>

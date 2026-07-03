@@ -54,6 +54,13 @@ export default function App() {
             <span>Token access — soon</span>
             <span>API — soon</span>
           </div>
+          <div className="footer-col">
+            <h4>Community</h4>
+            <a href="https://x.com/Formora_3D" target="_blank" rel="noopener noreferrer">
+              𝕏 @Formora_3D
+            </a>
+            <Link to="/">Public gallery</Link>
+          </div>
         </div>
         <div className="footer-legal muted small">
           © {new Date().getFullYear()} Formora · Sample gallery models from the Khronos glTF
