@@ -8,6 +8,7 @@ import { Repo } from "./db/repo.js";
 import { RealMeshyClient } from "./meshy/client.js";
 import { MockMeshyClient } from "./meshy/mock.js";
 import { ThreeDAIClient, ThreeDAIFastClient } from "./meshy/threedai.js";
+import { StabilityFastClient } from "./meshy/stability.js";
 import { persistModels } from "./persist.js";
 import { initStorage } from "./storage.js";
 import { UsageControl } from "./limits.js";
@@ -30,9 +31,14 @@ const meshy =
     : config.provider === "meshy"
       ? new RealMeshyClient()
       : new MockMeshyClient();
-// Modo Fast (~30-60s) via 3D AI Studio, disponible si hay key y no estamos en mock.
-const fast =
-  !config.meshyMock && config.threedaiApiKey ? new ThreeDAIFastClient() : undefined;
+// Modo Fast: Stability (<20s, sync) si hay key; si no, 3D AI Studio (~1-4 min).
+const fast = config.meshyMock
+  ? undefined
+  : config.stabilityApiKey
+    ? new StabilityFastClient()
+    : config.threedaiApiKey
+      ? new ThreeDAIFastClient()
+      : undefined;
 const usage = new UsageControl(repo, meshy, config);
 const poller = new JobPoller(
   repo,

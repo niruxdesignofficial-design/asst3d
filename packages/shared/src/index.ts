@@ -74,7 +74,7 @@ export const POLYCOUNT_MAX = 100_000;
 /** Velocidad de generación: fast ≈ 30-60s (TRELLIS), quality ≈ 2-6 min (más detalle). */
 export type GenerationSpeed = "fast" | "quality";
 export const SPEED_OPTIONS: { id: GenerationSpeed; label: string; blurb: string }[] = [
-  { id: "fast", label: "⚡ Fast", blurb: "~30-60 seconds — great for quick iteration" },
+  { id: "fast", label: "⚡ Fast", blurb: "~15-30 seconds — great for quick iteration" },
   { id: "quality", label: "✦ Quality", blurb: "2-6 minutes — more detail and cleaner textures" },
 ];
 

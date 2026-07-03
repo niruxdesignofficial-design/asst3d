@@ -53,6 +53,10 @@ export const config = {
   meshyBaseUrl: "https://api.meshy.ai",
   threedaiApiKey: threedaiKey,
   threedaiBaseUrl: "https://api.3daistudio.com",
+
+  // Stability AI: modo Fast real (<20s) — imagen sync + Stable Fast 3D sync.
+  stabilityApiKey: process.env.STABILITY_API_KEY?.trim() || "",
+  stabilityBaseUrl: "https://api.stability.ai",
   // Texturas PBR en Hunyuan Pro: +20 créditos por generación (80 vs 60).
   // Apagado por defecto para estirar los créditos; THREEDAI_PBR=true lo prende.
   threedaiPbr: process.env.THREEDAI_PBR === "true",

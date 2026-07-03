@@ -20,6 +20,9 @@ services:
         value: meshy
       - key: THREEDAI_API_KEY
         sync: false
+      # Modo Fast real (<20s): key de platform.stability.ai
+      - key: STABILITY_API_KEY
+        sync: false
       # PBR en texto→3D: mejor calidad, +20 créditos por generación (80 vs 60)
       - key: THREEDAI_PBR
         value: "false"

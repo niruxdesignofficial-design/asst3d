@@ -282,7 +282,7 @@ export function GeneratePanel({ onStarted, onDenied, compact = false, initialPro
           </div>
 
           <div className="cost-row">
-            <span className="muted small">{speed === "fast" ? "≈ 30-60 sec" : "≈ 2-6 min"}</span>
+            <span className="muted small">{speed === "fast" ? "≈ 15-30 sec" : "≈ 2-6 min"}</span>
             <span className="muted small">·</span>
             <span className="small">1 free generation</span>
           </div>
