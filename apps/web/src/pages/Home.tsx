@@ -14,6 +14,51 @@ interface Props {
 
 const FILTERS = ["Recommended", "Featured", "Recent", "All"] as const;
 
+const SUGGESTIONS = [
+  "rusty sentinel robot",
+  "ancient stone golem",
+  "cyberpunk hover bike",
+  "cozy wooden tavern",
+  "crystal cave mushroom",
+] as const;
+
+const STEPS = [
+  {
+    icon: "✎",
+    title: "Describe it",
+    body: "Type a prompt or drop a reference image. Pick an art style tuned for game engines — low-poly, stylized, pixel 3D or photoreal.",
+  },
+  {
+    icon: "⬡",
+    title: "Watch it build",
+    body: "Our AI sculpts the geometry and paints full PBR textures in minutes. Follow the progress live, right in your browser.",
+  },
+  {
+    icon: "⬇",
+    title: "Drop it in your game",
+    body: "Inspect topology in the 3D viewer, then export GLB, FBX, OBJ or USDZ — ready for Unity, Unreal, Godot or three.js.",
+  },
+] as const;
+
+const FAQS = [
+  {
+    q: "Is it really free to start?",
+    a: "Yes — every new visitor gets 3 free generations, no sign-up and no wallet required. When you run out, token access (coming soon) unlocks unlimited generations.",
+  },
+  {
+    q: "What formats can I download?",
+    a: "GLB out of the box for every model — the native format for Unity, Unreal, Godot and the web. Where the provider supports it you'll also see FBX, OBJ and USDZ buttons in the model page.",
+  },
+  {
+    q: "Can I use the models commercially?",
+    a: "Everything you generate publicly is released under CC0 — use it in commercial games, prototypes or jams with no attribution. Private exports arrive with token access.",
+  },
+  {
+    q: "How long does a generation take?",
+    a: "Typically 2–6 minutes depending on the queue and the detail level. You can keep browsing the gallery while it builds — your workspace tracks the progress.",
+  },
+] as const;
+
 const PROMOS = [
   {
     kicker: "GETTING STARTED",
@@ -55,6 +100,7 @@ export function Home({ me, refreshMe }: Props) {
   const [gate, setGate] = useState<string | null>(null);
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("Recommended");
   const [query, setQuery] = useState("");
+  const [seedPrompt, setSeedPrompt] = useState("");
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
 
@@ -110,12 +156,40 @@ export function Home({ me, refreshMe }: Props) {
         <div className="hero-box">
           <GeneratePanel
             compact
+            initialPrompt={seedPrompt}
             onStarted={(gen) => {
               refreshMe();
               navigate("/workspace", { state: { focusId: gen.id } });
             }}
             onDenied={setGate}
           />
+        </div>
+        <div className="hero-suggestions">
+          <span className="muted">Try:</span>
+          {SUGGESTIONS.map((s) => (
+            <button key={s} className="suggestion" onClick={() => setSeedPrompt(s)}>
+              {s}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="stats-strip">
+        <div className="stat">
+          <strong>2–6 min</strong>
+          <span>prompt to model</span>
+        </div>
+        <div className="stat">
+          <strong>4</strong>
+          <span>art styles for games</span>
+        </div>
+        <div className="stat">
+          <strong>GLB+</strong>
+          <span>engine-ready exports</span>
+        </div>
+        <div className="stat">
+          <strong>3 free</strong>
+          <span>generations to start</span>
         </div>
       </section>
 
@@ -136,6 +210,21 @@ export function Home({ me, refreshMe }: Props) {
             <span className="promo-cta">{p.cta} →</span>
           </article>
         ))}
+      </section>
+
+      <section className="steps">
+        <h2>From words to game-ready in three steps</h2>
+        <p className="muted">No modeling skills, no plugins — just describe what you need.</p>
+        <div className="steps-row">
+          {STEPS.map((s, i) => (
+            <div key={s.title} className="step">
+              <span className="step-num">{i + 1}</span>
+              <span className="step-icon">{s.icon}</span>
+              <h3>{s.title}</h3>
+              <p>{s.body}</p>
+            </div>
+          ))}
+        </div>
       </section>
 
       <section className="discover" id="discover">
@@ -176,6 +265,24 @@ export function Home({ me, refreshMe }: Props) {
             <p className="muted">No public models match that search — be the first to create one!</p>
           )}
         </div>
+      </section>
+
+      <section className="faq">
+        <h2>Frequently asked</h2>
+        {FAQS.map((f) => (
+          <details key={f.q}>
+            <summary>{f.q}</summary>
+            <p>{f.a}</p>
+          </details>
+        ))}
+      </section>
+
+      <section className="cta-banner">
+        <h2>Your next asset is one prompt away</h2>
+        <p>Start with 3 free generations — no sign-up, no credit card, no wallet.</p>
+        <button className="btn-primary" onClick={() => navigate("/workspace")}>
+          ✦ Open the workspace
+        </button>
       </section>
 
       {selected && <ModelModal gen={selected} onClose={closeModal} />}

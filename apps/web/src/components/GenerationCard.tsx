@@ -34,7 +34,10 @@ export function GenerationCard({ gen, onOpen, onLike, compact = false }: Props) 
         {thumb ? (
           <img src={thumb} alt={gen.prompt ?? "3D model"} loading="lazy" />
         ) : (
-          <div className="card-media-placeholder">◇</div>
+          <>
+            <div className="card-skeleton" />
+            <div className="card-media-placeholder">◇</div>
+          </>
         )}
         <span className="card-badge">{gen.kind === "text" ? "Text to 3D" : "Image to 3D"}</span>
         {!compact && gen.status === "done" && (

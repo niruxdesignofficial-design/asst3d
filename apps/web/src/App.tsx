@@ -32,6 +32,9 @@ export default function App() {
             <p className="muted small">
               AI 3D model generation for game developers. Describe it, preview it, ship it.
             </p>
+            <span className="footer-status">
+              <span className="status-dot" /> All systems operational
+            </span>
           </div>
           <div className="footer-col">
             <h4>Product</h4>

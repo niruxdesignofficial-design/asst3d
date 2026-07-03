@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ACCEPTED_IMAGE_TYPES,
   AI_MODELS,
@@ -18,10 +18,12 @@ interface Props {
   onDenied: (code: string) => void;
   /** compact = home hero box; full = workspace panel with advanced controls */
   compact?: boolean;
+  /** prefill the prompt (e.g. suggestion chips); updates when it changes */
+  initialPrompt?: string;
 }
 
 /** Generation form (text or image). Whether it CAN generate is always the server's call. */
-export function GeneratePanel({ onStarted, onDenied, compact = false }: Props) {
+export function GeneratePanel({ onStarted, onDenied, compact = false, initialPrompt }: Props) {
   const [kind, setKind] = useState<GenerationKind>("text");
   const [prompt, setPrompt] = useState("");
   const [styleId, setStyleId] = useState(STYLE_PRESETS[0].id);
@@ -32,6 +34,13 @@ export function GeneratePanel({ onStarted, onDenied, compact = false }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (initialPrompt) {
+      setKind("text");
+      setPrompt(initialPrompt);
+    }
+  }, [initialPrompt]);
 
   const style = STYLE_PRESETS.find((s) => s.id === styleId) ?? STYLE_PRESETS[0];
   const effectiveType = modelType ?? style.modelType;

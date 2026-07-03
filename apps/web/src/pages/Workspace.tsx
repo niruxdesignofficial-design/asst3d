@@ -89,6 +89,10 @@ export function Workspace({ me, refreshMe }: Props) {
               Generate a model from text or an image. Preview it in 3D, inspect the topology and
               download it ready for your game engine.
             </p>
+            <div className="ws-tip">
+              <strong>Pro tip:</strong> the best prompts name the object, its material and its
+              mood — “weathered bronze astronaut statue, moss-covered” beats “a statue”.
+            </div>
           </div>
         )}
 
@@ -96,12 +100,25 @@ export function Workspace({ me, refreshMe }: Props) {
           <div className="ws-progress">
             <h3>Generating “{current.prompt ?? "your model"}”…</h3>
             <div className="bar">
-              <div className="bar-fill" style={{ width: `${current.progress}%` }} />
+              <div className="bar-fill" style={{ width: `${Math.max(4, current.progress)}%` }} />
             </div>
-            <p className="muted small">
-              {current.progress < 50 ? "Building geometry" : "Applying textures"} ·{" "}
-              {current.progress}%
-            </p>
+            <p className="muted small">{current.progress}% — hang tight, usually 2–6 minutes</p>
+            <div className="stages">
+              {["Queued", "Geometry", "Textures", "Finalizing"].map((label, i) => {
+                const p = current.progress;
+                const stageIdx = p <= 0 ? 0 : p < 50 ? 1 : p < 95 ? 2 : 3;
+                const cls = i < stageIdx ? "stage-done" : i === stageIdx ? "stage-active" : "";
+                return (
+                  <span key={label} className={`stage ${cls}`}>
+                    {i < stageIdx ? "✓" : i === stageIdx ? "●" : "○"} {label}
+                  </span>
+                );
+              })}
+            </div>
+            <div className="ws-tip">
+              You can keep browsing the <strong>Community</strong> gallery while this builds —
+              the result lands in “My generations” automatically.
+            </div>
           </div>
         )}
 
