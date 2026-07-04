@@ -114,6 +114,12 @@ export const authVerify = (address: string, signature: string) =>
     { method: "POST", body: JSON.stringify({ address, signature }) }
   );
 
+export const uploadAvatar = (dataUri: string) =>
+  api<{ ok: true; avatarUrl: string | null }>("/api/users/avatar", {
+    method: "POST",
+    body: JSON.stringify({ dataUri }),
+  });
+
 export const claimUsername = (name: string) =>
   api<{ ok: true; username: string }>("/api/users/username", {
     method: "POST",
@@ -123,6 +129,7 @@ export const claimUsername = (name: string) =>
 export const getAuthorProfile = (name: string) =>
   api<{
     name: string;
+    avatarUrl: string | null;
     joinedAt: number;
     modelCount: number;
     totalLikes: number;

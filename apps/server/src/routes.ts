@@ -23,6 +23,7 @@ import { resolveSampleUrl } from "./meshy/mock.js";
 import { getStorage, isStoredRef } from "./storage.js";
 import { createSession, issueNonce, verifySession, verifyWalletSignature } from "./auth.js";
 import { findBlockedTerm } from "./moderation.js";
+import sharp from "sharp";
 import { EXPORT_PRESETS, isVariantPending, startVariant, type ExportPreset } from "./variants.js";
 
 interface Ctx {
@@ -77,6 +78,7 @@ export function registerRoutes(app: FastifyInstance, ctx: Ctx): void {
       paymentsEnabled: config.paymentsEnabled,
       hasTokenAccess: user.token_access === 1,
       walletAddress: user.wallet_address,
+      avatarUrl: repo.avatarUrlOf(user),
       fastProvider: ctx.fastProvider ?? null,
     };
     return me;
@@ -133,6 +135,44 @@ export function registerRoutes(app: FastifyInstance, ctx: Ctx): void {
     return { ok: true, username: name.trim() };
   });
 
+  // ---- foto de perfil (requiere sesión wallet; sharp la deja en 256px webp) ----
+  app.post("/api/users/avatar", async (req, reply) => {
+    const session = req.headers["x-session"];
+    const userId = typeof session === "string" ? verifySession(session) : null;
+    if (!userId) return reply.code(401).send({ error: "auth_required" });
+    const { dataUri } = req.body as { dataUri?: string };
+    const m = typeof dataUri === "string" ? dataUri.match(/^data:(image\/(?:png|jpeg|webp));base64,(.+)$/) : null;
+    if (!m) return reply.code(400).send({ error: "invalid_input" });
+    const raw = Buffer.from(m[2], "base64");
+    if (raw.length > 6 * 1024 * 1024)
+      return reply.code(400).send({ error: "invalid_input", message: "max 6MB" });
+    let processed: Buffer;
+    try {
+      processed = await sharp(raw)
+        .resize(256, 256, { fit: "cover" })
+        .webp({ quality: 82 })
+        .toBuffer();
+    } catch {
+      return reply.code(400).send({ error: "invalid_input", message: "not a valid image" });
+    }
+    const ref = await getStorage().put(`avatar:${userId}.webp`, processed, "image/webp");
+    await repo.setAvatar(userId, ref);
+    const user = await repo.getUser(userId);
+    return { ok: true, avatarUrl: repo.avatarUrlOf(user) };
+  });
+
+  app.get("/api/avatar/:userId", async (req, reply) => {
+    const { userId } = req.params as { userId: string };
+    const user = await repo.getUser(userId);
+    // solo cuentas wallet (id público); nunca exponer device ids de guests
+    if (!user?.avatar_ref || !user.wallet_address)
+      return reply.code(404).send({ error: "not_found" });
+    const stream = await getStorage().stream(user.avatar_ref);
+    if (!stream) return reply.code(404).send({ error: "not_found" });
+    reply.header("Cache-Control", "public, max-age=3600");
+    return reply.type("image/webp").send(stream);
+  });
+
   // ---- perfil público de autor ----
   app.get("/api/users/:name", async (req, reply) => {
     const { name } = req.params as { name: string };
@@ -144,6 +184,7 @@ export function registerRoutes(app: FastifyInstance, ctx: Ctx): void {
     const models = await repo.toDtos(rows);
     return {
       name: user.display_name,
+      avatarUrl: repo.avatarUrlOf(user),
       joinedAt: Number(user.created_at),
       modelCount: models.length,
       totalLikes: models.reduce((a, m) => a + m.likes, 0),
@@ -370,12 +411,16 @@ export function registerRoutes(app: FastifyInstance, ctx: Ctx): void {
     if (!(await repo.getGeneration(id))) return reply.code(404).send({ error: "not_found" });
     const rows = await repo.listComments(id);
     const dto: CommentDto[] = await Promise.all(
-      rows.map(async (c) => ({
-        id: c.id,
-        authorName: (await repo.getUser(c.user_id))?.display_name ?? "guest",
-        body: c.body,
-        createdAt: Number(c.created_at),
-      }))
+      rows.map(async (c) => {
+        const author = await repo.getUser(c.user_id);
+        return {
+          id: c.id,
+          authorName: author?.display_name ?? "guest",
+          authorAvatar: repo.avatarUrlOf(author),
+          body: c.body,
+          createdAt: Number(c.created_at),
+        };
+      })
     );
     return dto;
   });
@@ -394,6 +439,7 @@ export function registerRoutes(app: FastifyInstance, ctx: Ctx): void {
     const dto: CommentDto = {
       id: comment.id,
       authorName: user.display_name ?? "guest",
+      authorAvatar: repo.avatarUrlOf(user),
       body: text,
       createdAt: Number(comment.created_at),
     };

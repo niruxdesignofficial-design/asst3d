@@ -20,6 +20,7 @@ import {
 } from "../lib/api";
 import { useNavigate } from "react-router-dom";
 import { ModelViewer } from "./ModelViewer";
+import { Avatar } from "./Avatar";
 
 interface Props {
   gen: GenerationDto;
@@ -191,7 +192,7 @@ export function ModelModal({ gen, onClose, onChanged }: Props) {
         </div>
         <aside className="modal-side">
           <div className="modal-author">
-            <span className="avatar-dot big">{gen.authorName.slice(0, 1).toUpperCase()}</span>
+            <Avatar name={gen.authorName} src={gen.authorAvatar} size={34} />
             <div className="modal-author-info">
               <strong>{gen.authorName}</strong>
               <div className="muted small">{timeAgo(gen.createdAt)}</div>
@@ -367,7 +368,7 @@ export function ModelModal({ gen, onClose, onChanged }: Props) {
             <div className="comment-list">
               {comments.map((c) => (
                 <div key={c.id} className="comment">
-                  <span className="avatar-dot">{c.authorName.slice(0, 1).toUpperCase()}</span>
+                  <Avatar name={c.authorName} src={c.authorAvatar} size={20} />
                   <div>
                     <div className="comment-head">
                       <strong>{c.authorName}</strong>

@@ -1,6 +1,14 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { MeDto } from "@asst3d/shared";
-import { ApiError, authNonce, authVerify, claimUsername, setSession } from "../lib/api";
+import {
+  ApiError,
+  authNonce,
+  authVerify,
+  claimUsername,
+  setSession,
+  uploadAvatar,
+} from "../lib/api";
+import { Avatar } from "./Avatar";
 
 /** API mínima de Phantom (window.solana) — patrón estándar de Solana. */
 interface PhantomProvider {
@@ -25,8 +33,29 @@ export function WalletButton({ me, refreshMe }: Props) {
   const [askName, setAskName] = useState(false);
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [avatarBust, setAvatarBust] = useState(0);
 
   const connected = !!me?.walletAddress;
+
+  const pickAvatar = (file: File | undefined) => {
+    if (!file) return;
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type) || file.size > 6e6) {
+      setError("png/jpg/webp up to 6MB");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        await uploadAvatar(String(reader.result));
+        setAvatarBust(Date.now()); // recargar la imagen cacheada
+        refreshMe();
+      } catch {
+        setError("Could not upload the photo");
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   const connect = async () => {
     setError(null);
@@ -80,13 +109,33 @@ export function WalletButton({ me, refreshMe }: Props) {
   return (
     <>
       {connected ? (
-        <button
-          className="btn-mini wallet-chip"
-          onClick={disconnect}
-          title={`${me?.walletAddress} — click to disconnect`}
-        >
-          ◉ {me?.username ?? `${me?.walletAddress?.slice(0, 4)}…${me?.walletAddress?.slice(-4)}`}
-        </button>
+        <span className="wallet-group">
+          <button
+            className="avatar-btn"
+            title="Change profile photo"
+            onClick={() => avatarInputRef.current?.click()}
+          >
+            <Avatar
+              name={me?.username ?? me?.walletAddress ?? "?"}
+              src={me?.avatarUrl ? `${me.avatarUrl}?v=${avatarBust}` : null}
+              size={30}
+            />
+          </button>
+          <input
+            ref={avatarInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            hidden
+            onChange={(e) => pickAvatar(e.target.files?.[0] ?? undefined)}
+          />
+          <button
+            className="btn-mini wallet-chip"
+            onClick={disconnect}
+            title={`${me?.walletAddress} — click to disconnect`}
+          >
+            ◉ {me?.username ?? `${me?.walletAddress?.slice(0, 4)}…${me?.walletAddress?.slice(-4)}`}
+          </button>
+        </span>
       ) : (
         <button className="btn-mini" onClick={connect} disabled={busy} title="Sign in with your Solana wallet">
           {busy ? "…" : "Connect wallet"}

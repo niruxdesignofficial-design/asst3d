@@ -102,6 +102,8 @@ export interface GenerationDto {
   error: string | null;
   isPublic: boolean;
   authorName: string;
+  /** URL de la foto de perfil del autor, o null (fallback: inicial) */
+  authorAvatar: string | null;
   /** true si el modelo pertenece al usuario del request */
   isMine: boolean;
   /** presets de export ya cacheados (mobile/pc) */
@@ -115,6 +117,7 @@ export interface GenerationDto {
 export interface CommentDto {
   id: number;
   authorName: string;
+  authorAvatar: string | null;
   body: string;
   createdAt: number;
 }
@@ -125,6 +128,8 @@ export interface MeDto {
   userId: string;
   /** username reservado, o null si todavía no eligió */
   username: string | null;
+  /** URL de la foto de perfil propia, o null */
+  avatarUrl: string | null;
   freeLimit: number;
   freeUsed: number;
   freeRemaining: number;

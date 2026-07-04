@@ -4,9 +4,11 @@ import type { GenerationDto } from "@asst3d/shared";
 import { getAuthorProfile, likeGeneration } from "../lib/api";
 import { GenerationCard } from "../components/GenerationCard";
 import { ModelModal } from "../components/ModelModal";
+import { Avatar } from "../components/Avatar";
 
 interface Profile {
   name: string;
+  avatarUrl: string | null;
   joinedAt: number;
   modelCount: number;
   totalLikes: number;
@@ -45,9 +47,12 @@ export function Author() {
   return (
     <main className="author">
       <div className="author-head">
-        <span className="avatar-dot big author-avatar">
-          {(profile?.name ?? name ?? "?").slice(0, 1).toUpperCase()}
-        </span>
+        <Avatar
+          name={profile?.name ?? name ?? "?"}
+          src={profile?.avatarUrl}
+          size={64}
+          className="author-avatar"
+        />
         <h1>{profile?.name ?? name}</h1>
         {profile && (
           <div className="author-stats">

@@ -17,6 +17,7 @@ export interface UserRow {
   token_access: number;
   banned: number;
   display_name: string | null;
+  avatar_ref: string | null;
 }
 
 export interface GenerationRow {
@@ -93,6 +94,17 @@ export class Repo {
 
   async setDisplayName(userId: string, name: string): Promise<void> {
     await this.db.run(`UPDATE users SET display_name = ? WHERE id = ?`, [name, userId]);
+  }
+
+  async setAvatar(userId: string, ref: string): Promise<void> {
+    await this.db.run(`UPDATE users SET avatar_ref = ? WHERE id = ?`, [ref, userId]);
+  }
+
+  /** URL pública del avatar de un usuario, o null. Solo cuentas wallet (id público). */
+  avatarUrlOf(user: UserRow | undefined): string | null {
+    return user?.avatar_ref && user.wallet_address
+      ? `/api/avatar/${encodeURIComponent(user.id)}`
+      : null;
   }
 
   getUserByName(name: string): Promise<UserRow | undefined> {
@@ -376,6 +388,7 @@ export class Repo {
       error: row.error,
       isPublic: row.is_public === 1,
       authorName: user?.display_name ?? "guest",
+      authorAvatar: this.avatarUrlOf(user),
       isMine: !!requesterId && row.user_id === requesterId,
       variants: row.variants ? Object.keys(JSON.parse(row.variants)) : [],
       supportsVariants:

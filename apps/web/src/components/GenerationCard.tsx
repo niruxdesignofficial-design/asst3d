@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { GenerationDto } from "@asst3d/shared";
 import { thumbnailFor } from "../lib/thumbs";
 import { downloadUrl } from "../lib/api";
+import { Avatar } from "./Avatar";
 
 interface Props {
   gen: GenerationDto;
@@ -70,9 +71,7 @@ export function GenerationCard({ gen, onOpen, onLike, compact = false }: Props) 
               window.location.href = `/u/${encodeURIComponent(gen.authorName)}`;
             }}
           >
-            <span className="avatar-dot" aria-hidden>
-              {gen.authorName.slice(0, 1).toUpperCase()}
-            </span>
+            <Avatar name={gen.authorName} src={gen.authorAvatar} size={20} />
             {gen.authorName}
           </span>
           <button

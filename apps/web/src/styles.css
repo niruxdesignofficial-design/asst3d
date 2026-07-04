@@ -671,6 +671,32 @@ a {
   gap: 6px;
 }
 
+/* avatars */
+.avatar-img {
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid var(--border-strong);
+}
+.wallet-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.avatar-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  border-radius: 50%;
+  line-height: 0;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.avatar-btn:hover {
+  transform: scale(1.08);
+  box-shadow: 0 0 0 2px var(--accent);
+  border-radius: 50%;
+}
+
 /* wallet + ownership */
 .wallet-chip {
   border-color: rgba(110, 231, 183, 0.45);
